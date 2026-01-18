@@ -1,0 +1,315 @@
+import { Home, FileText, Inbox, Truck, DollarSign, Star, User, Phone, Mail, MapPin, Car, Shield, Lock, TrendingUp, CreditCard, BarChart3 } from 'lucide-react';
+
+interface DriverSystemProfileProps {
+  onNavigateToDashboard: () => void;
+  onNavigateToMyOffers: () => void;
+  onNavigateToIncomingRequests: () => void;
+  onNavigateToActiveDeliveries: () => void;
+  onNavigateToEarnings: () => void;
+  onNavigateToReviews: () => void;
+}
+
+export function DriverSystemProfile({
+  onNavigateToDashboard,
+  onNavigateToMyOffers,
+  onNavigateToIncomingRequests,
+  onNavigateToActiveDeliveries,
+  onNavigateToEarnings,
+  onNavigateToReviews,
+}: DriverSystemProfileProps) {
+  return (
+    <div className="size-full flex bg-gray-50">
+      {/* Fixed Left Sidebar */}
+      <aside className="w-64 bg-gradient-to-b from-purple-600 to-blue-600 text-white flex-shrink-0 flex flex-col">
+        {/* Logo */}
+        <div className="p-6 border-b border-white/10">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center shadow-lg">
+              <div className="text-center">
+                <div className="text-sm font-bold bg-gradient-to-r from-purple-600 to-blue-500 bg-clip-text text-transparent">
+                  Go
+                </div>
+                <div className="text-xs font-bold bg-gradient-to-r from-purple-600 to-blue-500 bg-clip-text text-transparent -mt-0.5">
+                  Local
+                </div>
+              </div>
+            </div>
+            <div>
+              <h2 className="font-bold text-lg">Driver System</h2>
+            </div>
+          </div>
+        </div>
+
+        {/* Navigation Menu */}
+        <nav className="flex-1 py-6 overflow-y-auto">
+          <button 
+            onClick={onNavigateToDashboard}
+            className="w-full px-6 py-3 flex items-center gap-3 hover:bg-white/10 transition-colors text-white/90 hover:text-white"
+          >
+            <Home className="w-5 h-5" />
+            Dashboard
+          </button>
+          
+          <button 
+            onClick={onNavigateToMyOffers}
+            className="w-full px-6 py-3 flex items-center gap-3 hover:bg-white/10 transition-colors text-white/90 hover:text-white"
+          >
+            <FileText className="w-5 h-5" />
+            My Offers
+          </button>
+          
+          <button 
+            onClick={onNavigateToIncomingRequests}
+            className="w-full px-6 py-3 flex items-center gap-3 hover:bg-white/10 transition-colors text-white/90 hover:text-white"
+          >
+            <Inbox className="w-5 h-5" />
+            Incoming Requests
+            <span className="ml-auto bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">3</span>
+          </button>
+          
+          <button 
+            onClick={onNavigateToActiveDeliveries}
+            className="w-full px-6 py-3 flex items-center gap-3 hover:bg-white/10 transition-colors text-white/90 hover:text-white"
+          >
+            <Truck className="w-5 h-5" />
+            Active Deliveries
+            <span className="ml-auto bg-green-500 text-white text-xs px-2 py-0.5 rounded-full">2</span>
+          </button>
+          
+          <button 
+            onClick={onNavigateToEarnings}
+            className="w-full px-6 py-3 flex items-center gap-3 hover:bg-white/10 transition-colors text-white/90 hover:text-white"
+          >
+            <DollarSign className="w-5 h-5" />
+            Earnings
+          </button>
+          
+          <button 
+            onClick={onNavigateToReviews}
+            className="w-full px-6 py-3 flex items-center gap-3 hover:bg-white/10 transition-colors text-white/90 hover:text-white"
+          >
+            <Star className="w-5 h-5" />
+            Reviews
+          </button>
+          
+          <button className="w-full px-6 py-3 flex items-center gap-3 bg-white/10 border-l-4 border-white text-white font-semibold">
+            <User className="w-5 h-5" />
+            Profile
+          </button>
+        </nav>
+
+        {/* Footer */}
+        <div className="p-6 border-t border-white/10">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
+              <User className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <p className="font-semibold text-sm">Driver</p>
+              <p className="text-xs text-white/70">Ahmed Al-Khalifa</p>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      {/* Main Content Area */}
+      <main className="flex-1 overflow-y-auto">
+        {/* Header */}
+        <header className="bg-white border-b border-gray-200 px-8 py-6">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-800">Driver Profile</h1>
+            <p className="text-gray-500 mt-1">View your profile information</p>
+          </div>
+        </header>
+
+        {/* Content */}
+        <div className="p-8">
+          <div className="max-w-4xl mx-auto">
+            {/* Profile Header Card */}
+            <div className="bg-gradient-to-r from-purple-600 to-blue-500 rounded-2xl p-8 mb-6 shadow-lg">
+              <div className="flex items-center gap-6">
+                <div className="w-24 h-24 rounded-full bg-white flex items-center justify-center shadow-xl">
+                  <span className="text-purple-600 font-bold text-4xl">A</span>
+                </div>
+                <div className="flex-1">
+                  <h2 className="text-3xl font-bold text-white mb-2">Ahmed Al-Khalifa</h2>
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 bg-white/20 px-4 py-2 rounded-full">
+                      <Star className="w-5 h-5 text-yellow-300 fill-yellow-300" />
+                      <span className="text-white font-semibold">4.9 Rating</span>
+                    </div>
+                    <div className="bg-white/20 px-4 py-2 rounded-full">
+                      <span className="text-white font-semibold">342 Deliveries</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Personal Information */}
+            <div className="bg-white rounded-2xl shadow-md border border-gray-100 p-6 mb-6">
+              <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+                <User className="w-6 h-6 text-purple-600" />
+                Personal Information
+              </h3>
+              
+              <div className="grid grid-cols-2 gap-6">
+                <div>
+                  <label className="text-xs text-gray-500 mb-2 block">Full Name</label>
+                  <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+                    <User className="w-5 h-5 text-gray-400" />
+                    <span className="text-gray-800 font-semibold">Ahmed Al-Khalifa</span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs text-gray-500 mb-2 block">Phone Number</label>
+                  <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+                    <Phone className="w-5 h-5 text-gray-400" />
+                    <span className="text-gray-800 font-semibold">+973 3456 7890</span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs text-gray-500 mb-2 block">Email Address</label>
+                  <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+                    <Mail className="w-5 h-5 text-gray-400" />
+                    <span className="text-gray-800 font-semibold">ahmed.alkhalifa@example.com</span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs text-gray-500 mb-2 block">City</label>
+                  <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+                    <MapPin className="w-5 h-5 text-gray-400" />
+                    <span className="text-gray-800 font-semibold">Manama</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Vehicle Information */}
+            <div className="bg-white rounded-2xl shadow-md border border-gray-100 p-6 mb-6">
+              <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+                <Car className="w-6 h-6 text-purple-600" />
+                Vehicle Information
+              </h3>
+              
+              <div className="grid grid-cols-2 gap-6">
+                <div>
+                  <label className="text-xs text-gray-500 mb-2 block">Vehicle Type</label>
+                  <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+                    <Car className="w-5 h-5 text-gray-400" />
+                    <span className="text-gray-800 font-semibold">Sedan</span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs text-gray-500 mb-2 block">Plate Number</label>
+                  <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+                    <FileText className="w-5 h-5 text-gray-400" />
+                    <span className="text-gray-800 font-semibold">ABC 1234</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Account Status */}
+            <div className="bg-white rounded-2xl shadow-md border border-gray-100 p-6 mb-6">
+              <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+                <Shield className="w-6 h-6 text-purple-600" />
+                Account Status
+              </h3>
+              
+              <div className="flex items-center justify-between p-4 bg-blue-50 rounded-xl border-2 border-blue-200">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                    <Shield className="w-6 h-6 text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-gray-800">Managed by GoLocal System</p>
+                    <p className="text-sm text-gray-600">Your account is centrally managed for security</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 bg-green-100 px-4 py-2 rounded-full">
+                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  <span className="text-green-700 font-semibold text-sm">Active</span>
+                </div>
+              </div>
+
+              <div className="mt-4 p-4 bg-gray-50 rounded-xl">
+                <p className="text-sm text-gray-600">
+                  <strong>Note:</strong> Profile information is read-only. To update your details, please contact GoLocal support.
+                </p>
+              </div>
+            </div>
+
+            {/* Future Features - Locked Cards */}
+            <div className="bg-white rounded-2xl shadow-md border border-gray-100 p-6">
+              <h3 className="text-xl font-bold text-gray-800 mb-4">Future Features</h3>
+              
+              <div className="space-y-3">
+                {/* Live Tracking */}
+                <div className="p-4 bg-gray-50 rounded-xl border-2 border-gray-200 opacity-60">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
+                        <TrendingUp className="w-6 h-6 text-purple-600" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-gray-800">Live Tracking</p>
+                        <p className="text-sm text-gray-500">Real-time GPS tracking for deliveries</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 bg-gray-200 px-4 py-2 rounded-full">
+                      <Lock className="w-4 h-4 text-gray-600" />
+                      <span className="text-gray-600 font-semibold text-sm">Coming Soon</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Payments */}
+                <div className="p-4 bg-gray-50 rounded-xl border-2 border-gray-200 opacity-60">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
+                        <CreditCard className="w-6 h-6 text-green-600" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-gray-800">Payments</p>
+                        <p className="text-sm text-gray-500">Direct payment processing & payouts</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 bg-gray-200 px-4 py-2 rounded-full">
+                      <Lock className="w-4 h-4 text-gray-600" />
+                      <span className="text-gray-600 font-semibold text-sm">Coming Soon</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Analytics */}
+                <div className="p-4 bg-gray-50 rounded-xl border-2 border-gray-200 opacity-60">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                        <BarChart3 className="w-6 h-6 text-blue-600" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-gray-800">Analytics</p>
+                        <p className="text-sm text-gray-500">Detailed performance insights & reports</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 bg-gray-200 px-4 py-2 rounded-full">
+                      <Lock className="w-4 h-4 text-gray-600" />
+                      <span className="text-gray-600 font-semibold text-sm">Coming Soon</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}

@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { AdminLogin } from './AdminLogin';
 import { AdminDashboard } from './AdminDashboard';
 import { AdminUsers } from './AdminUsers';
 import { AdminDrivers } from './AdminDrivers';
@@ -13,13 +12,7 @@ import { AdminNotifications } from './AdminNotifications';
 import { AdminSettings } from './AdminSettings';
 
 export function AdminSystemApp() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentPage, setCurrentPage] = useState<'dashboard' | 'users' | 'drivers' | 'trips' | 'delivery' | 'payments' | 'complaints' | 'violations' | 'reports' | 'notifications' | 'settings'>('dashboard');
-
-  // Login
-  if (!isLoggedIn) {
-    return <AdminLogin onLogin={() => setIsLoggedIn(true)} />;
-  }
 
   // Navigate based on current page
   const handleNavigation = (page: 'dashboard' | 'users' | 'drivers' | 'trips' | 'delivery' | 'payments' | 'complaints' | 'violations' | 'reports' | 'notifications' | 'settings') => {

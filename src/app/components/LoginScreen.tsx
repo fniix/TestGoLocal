@@ -1,15 +1,20 @@
 import { ArrowLeft } from 'lucide-react';
 import { useState } from 'react';
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
+import { auth, db } from "../../firebase";
 
 interface LoginScreenProps {
   onBack: () => void;
   onCreateAccount: () => void;
   onLogin?: () => void;
+  onLoginAsAdmin?: () => void;
+  onLoginAsDriver?: () => void;
   onNavigateHomeAsGuest?: () => void;
   onNavigateProfileAsGuest?: () => void;
 }
 
-export function LoginScreen({ onBack, onCreateAccount, onLogin, onNavigateHomeAsGuest, onNavigateProfileAsGuest }: LoginScreenProps) {
+export function LoginScreen({ onBack, onCreateAccount, onLogin, onLoginAsAdmin, onLoginAsDriver, onNavigateHomeAsGuest, onNavigateProfileAsGuest }: LoginScreenProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState({
@@ -22,7 +27,7 @@ export function LoginScreen({ onBack, onCreateAccount, onLogin, onNavigateHomeAs
     return emailRegex.test(email);
   };
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     const newErrors = {
       email: '',
       password: ''
@@ -44,10 +49,42 @@ export function LoginScreen({ onBack, onCreateAccount, onLogin, onNavigateHomeAs
 
     setErrors(newErrors);
 
-    // If no errors, proceed with login
+    // If no errors, proceed with Firebase login
     if (!newErrors.email && !newErrors.password) {
-      if (onLogin) {
-        onLogin();
+      try {
+        const userCred = await signInWithEmailAndPassword(auth, email, password);
+        const uid = userCred.user.uid;
+
+        // نقرأ بياناته من Firestore
+        const userRef = doc(db, "users", uid);
+        const snap = await getDoc(userRef);
+
+        if (!snap.exists()) {
+          alert("User data not found");
+          return;
+        }
+
+        const data = snap.data();
+        const role = data.role?.toLowerCase() || 'user'; // تحويل إلى أحرف صغيرة
+
+        if (role === "admin") {
+          if (onLoginAsAdmin) {
+            onLoginAsAdmin();
+          }
+        } 
+        else if (role === "driver") {
+          if (onLoginAsDriver) {
+            onLoginAsDriver();
+          }
+        } 
+        else {
+          if (onLogin) {
+            onLogin();
+          }
+        }
+
+      } catch (err) {
+        alert("Invalid email or password");
       }
     }
   };
@@ -182,6 +219,10 @@ export function LoginScreen({ onBack, onCreateAccount, onLogin, onNavigateHomeAs
             >
               Continue as Guest
             </button>
+            <p className="text-xs text-gray-400 mt-2">
+              You can browse services without creating an account.<br />
+              Booking history and activities will not be saved.
+            </p>
           </div>
         </div>
       </div>

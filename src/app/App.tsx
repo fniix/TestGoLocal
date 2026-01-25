@@ -64,7 +64,19 @@ export default function App() {
           setCurrentScreen('splash');
         }}
         onCreateAccount={() => setCurrentScreen('register')}
-        onLogin={() => setCurrentScreen('home')}
+        onLogin={() => {
+          setUserName('user123@gmail.com');
+          setCurrentScreen('home');
+        }}
+        onLoginAsAdmin={() => {
+          setUserName('admin123@gmail.com');
+          setCurrentScreen('admin-system');
+        }}
+        onLoginAsDriver={() => {
+          setUserName('driver123@gmail.com');
+          setIsDriver(true);
+          setCurrentScreen('driver-system');
+        }}
         onNavigateHomeAsGuest={() => {
           setUserName(''); // Ensure guest mode
           setCurrentScreen('home');
@@ -91,13 +103,14 @@ export default function App() {
           setIsDriver(false);
           setCurrentScreen('home');
         }}
-        onRegisterDriver={(name: string, city: string, vehicleTypeValue: string, vehiclePlateValue: string) => {
+        onRegisterDriver={(name: string, city: string, vehicleTypeValue: string, vehiclePlateValue: string, driverLicenseNumber: string, permitNumber: string) => {
           setUserName(name);
           setUserCity(city);
           setVehicleType(vehicleTypeValue);
           setVehiclePlate(vehiclePlateValue);
           setIsDriver(true);
-          setCurrentScreen('driver-dashboard');
+          // Driver needs to wait for approval - show them a pending screen or redirect to login
+          setCurrentScreen('login');
         }}
         onNavigateHome={() => {
           setUserName(''); // Ensure guest mode
@@ -332,7 +345,7 @@ export default function App() {
   }
 
   return (
-    <div className="size-full flex items-center justify-center bg-gradient-to-b from-purple-600 to-blue-500">
+    <div className="w-screen h-screen flex items-center justify-center bg-gradient-to-b from-purple-600 to-blue-500">
       <div className="flex flex-col items-center justify-between h-full w-full max-w-md px-6 py-12">
         {/* Logo and Tagline Section */}
         <div className="flex-1 flex flex-col items-center justify-center">
@@ -371,26 +384,6 @@ export default function App() {
           >
             Create Account
           </button>
-
-          {/* Driver System Access */}
-          <div className="pt-4 border-t border-white/30">
-            <button 
-              onClick={() => setCurrentScreen('driver-system')}
-              className="w-full bg-white/10 backdrop-blur-sm border-2 border-white/50 text-white py-3 rounded-full font-semibold hover:bg-white/20 transition-all"
-            >
-              🚕 Driver System Demo
-            </button>
-          </div>
-
-          {/* Admin System Access */}
-          <div className="pt-4 border-t border-white/30">
-            <button 
-              onClick={() => setCurrentScreen('admin-system')}
-              className="w-full bg-white/10 backdrop-blur-sm border-2 border-white/50 text-white py-3 rounded-full font-semibold hover:bg-white/20 transition-all"
-            >
-              🛠️ Admin System Demo
-            </button>
-          </div>
         </div>
       </div>
     </div>

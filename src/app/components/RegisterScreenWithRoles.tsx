@@ -1,11 +1,14 @@
 import { ArrowLeft } from 'lucide-react';
 import { useState } from 'react';
+import { createUserWithEmailAndPassword } from "firebase/auth";
+import { setDoc, doc, serverTimestamp } from "firebase/firestore";
+import { auth, db } from "../../firebase";
 
 interface RegisterScreenWithRolesProps {
   onBack: () => void;
   onLogin: () => void;
   onRegisterPassenger?: (name: string, city: string) => void;
-  onRegisterDriver?: (name: string, city: string, vehicleType: string, vehiclePlate: string) => void;
+  onRegisterDriver?: (name: string, city: string, vehicleType: string, vehiclePlate: string, driverLicense: string, permitNumber: string) => void;
   onNavigateHome?: () => void;
   onNavigateSettings?: () => void;
 }
@@ -27,6 +30,12 @@ export function RegisterScreenWithRoles({
   const [city, setCity] = useState('');
   const [vehicleType, setVehicleType] = useState('');
   const [vehiclePlate, setVehiclePlate] = useState('');
+  const [driverLicenseNumber, setDriverLicenseNumber] = useState('');
+  const [permitNumber, setPermitNumber] = useState('');
+  const [idCardImage, setIdCardImage] = useState<File | null>(null);
+  const [driverLicenseImage, setDriverLicenseImage] = useState<File | null>(null);
+  const [vehicleRegistrationImage, setVehicleRegistrationImage] = useState<File | null>(null);
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   const [errors, setErrors] = useState({
     fullName: '',
     phoneNumber: '',
@@ -35,7 +44,12 @@ export function RegisterScreenWithRoles({
     confirmPassword: '',
     city: '',
     vehicleType: '',
-    vehiclePlate: ''
+    vehiclePlate: '',
+    driverLicenseNumber: '',
+    permitNumber: '',
+    idCardImage: '',
+    driverLicenseImage: '',
+    vehicleRegistrationImage: ''
   });
 
   const validateFullName = (name: string): { isValid: boolean; message: string } => {
@@ -127,6 +141,26 @@ export function RegisterScreenWithRoles({
     return { isValid: true, message: '' };
   };
 
+  const validateDriverLicenseNumber = (license: string): { isValid: boolean; message: string } => {
+    if (!license.trim()) {
+      return { isValid: false, message: 'Driver license number is required' };
+    }
+    if (license.trim().length < 5) {
+      return { isValid: false, message: 'Please enter a valid license number' };
+    }
+    return { isValid: true, message: '' };
+  };
+
+  const validatePermitNumber = (permit: string): { isValid: boolean; message: string } => {
+    if (!permit.trim()) {
+      return { isValid: false, message: 'Permit number is required' };
+    }
+    if (permit.trim().length < 5) {
+      return { isValid: false, message: 'Please enter a valid permit number' };
+    }
+    return { isValid: true, message: '' };
+  };
+
   // Check if all fields are valid
   const isFormValid = (): boolean => {
     const nameValid = validateFullName(fullName).isValid;
@@ -141,7 +175,15 @@ export function RegisterScreenWithRoles({
     } else {
       const vehicleTypeValid = validateVehicleType(vehicleType).isValid;
       const vehiclePlateValid = validateVehiclePlate(vehiclePlate).isValid;
-      return nameValid && phoneValid && emailValid && passwordValid && confirmPasswordValid && cityValid && vehicleTypeValid && vehiclePlateValid;
+      const driverLicenseValid = validateDriverLicenseNumber(driverLicenseNumber).isValid;
+      const permitValid = validatePermitNumber(permitNumber).isValid;
+      const idCardImageValid = idCardImage !== null;
+      const driverLicenseImageValid = driverLicenseImage !== null;
+      const vehicleRegImageValid = vehicleRegistrationImage !== null;
+      
+      return nameValid && phoneValid && emailValid && passwordValid && confirmPasswordValid && cityValid && 
+             vehicleTypeValid && vehiclePlateValid && driverLicenseValid && permitValid && 
+             idCardImageValid && driverLicenseImageValid && vehicleRegImageValid;
     }
   };
 
@@ -172,12 +214,74 @@ export function RegisterScreenWithRoles({
       case 'vehiclePlate':
         validation = validateVehiclePlate(value);
         break;
+      case 'driverLicenseNumber':
+        validation = validateDriverLicenseNumber(value);
+        break;
+      case 'permitNumber':
+        validation = validatePermitNumber(value);
+        break;
       default:
         return;
     }
     
     if (!validation.isValid) {
       setErrors({ ...errors, [field]: validation.message });
+    }
+  };
+
+  const registerPassenger = async (emailValue: string, passwordValue: string, nameValue: string, cityValue: string, phoneValue: string) => {
+    try {
+      const cred = await createUserWithEmailAndPassword(auth, emailValue, passwordValue);
+
+      await setDoc(doc(db, "users", cred.user.uid), {
+        role: "user",
+        name: nameValue,
+        email: emailValue,
+        phone: phoneValue,
+        city: cityValue,
+        createdAt: serverTimestamp(),
+      });
+
+      if (onRegisterPassenger) {
+        onRegisterPassenger(nameValue, cityValue);
+      }
+    } catch (err) {
+      alert("Error creating account: " + err);
+    }
+  };
+
+  const registerDriver = async (
+    emailValue: string,
+    passwordValue: string,
+    nameValue: string,
+    cityValue: string,
+    vehicleTypeValue: string,
+    plateValue: string,
+    licenseValue: string,
+    permitValue: string
+  ) => {
+    try {
+      const cred = await createUserWithEmailAndPassword(auth, emailValue, passwordValue);
+
+      await setDoc(doc(db, "users", cred.user.uid), {
+        role: "driver",
+        status: "pending",
+        name: nameValue,
+        email: emailValue,
+        city: cityValue,
+        vehicleType: vehicleTypeValue,
+        plate: plateValue,
+        license: licenseValue,
+        permit: permitValue,
+        createdAt: serverTimestamp(),
+      });
+
+      alert("Your application has been submitted successfully. It will be reviewed by GoLocal administration.");
+      if (onLogin) {
+        onLogin();
+      }
+    } catch (err) {
+      alert("Error creating driver account: " + err);
     }
   };
 
@@ -190,7 +294,12 @@ export function RegisterScreenWithRoles({
       confirmPassword: '',
       city: '',
       vehicleType: '',
-      vehiclePlate: ''
+      vehiclePlate: '',
+      driverLicenseNumber: '',
+      permitNumber: '',
+      idCardImage: '',
+      driverLicenseImage: '',
+      vehicleRegistrationImage: ''
     };
 
     // Validate all common fields
@@ -235,6 +344,28 @@ export function RegisterScreenWithRoles({
       if (!vehiclePlateValidation.isValid) {
         newErrors.vehiclePlate = vehiclePlateValidation.message;
       }
+
+      const driverLicenseValidation = validateDriverLicenseNumber(driverLicenseNumber);
+      if (!driverLicenseValidation.isValid) {
+        newErrors.driverLicenseNumber = driverLicenseValidation.message;
+      }
+
+      const permitValidation = validatePermitNumber(permitNumber);
+      if (!permitValidation.isValid) {
+        newErrors.permitNumber = permitValidation.message;
+      }
+
+      if (!idCardImage) {
+        newErrors.idCardImage = 'ID Card image is required';
+      }
+
+      if (!driverLicenseImage) {
+        newErrors.driverLicenseImage = 'Driver License image is required';
+      }
+
+      if (!vehicleRegistrationImage) {
+        newErrors.vehicleRegistrationImage = 'Vehicle Registration image is required';
+      }
     }
 
     setErrors(newErrors);
@@ -242,10 +373,11 @@ export function RegisterScreenWithRoles({
     // If no errors, proceed with registration
     const hasErrors = Object.values(newErrors).some(error => error !== '');
     if (!hasErrors) {
-      if (selectedRole === 'passenger' && onRegisterPassenger) {
-        onRegisterPassenger(fullName, city);
-      } else if (selectedRole === 'driver' && onRegisterDriver) {
-        onRegisterDriver(fullName, city, vehicleType, vehiclePlate);
+      if (selectedRole === 'passenger') {
+        registerPassenger(email, password, fullName, city, phoneNumber);
+      } else if (selectedRole === 'driver') {
+        registerDriver(email, password, fullName, city, vehicleType, vehiclePlate, driverLicenseNumber, permitNumber);
+        setShowSuccessMessage(true);
       }
     }
   };
@@ -298,7 +430,7 @@ export function RegisterScreenWithRoles({
                     🚗
                   </div>
                   <div className={`text-sm font-semibold ${selectedRole === 'passenger' ? 'text-purple-600' : 'text-gray-700'}`}>
-                    Passenger
+                    User
                   </div>
                 </div>
               </button>
@@ -515,6 +647,108 @@ export function RegisterScreenWithRoles({
                   <p className="text-red-500 text-xs mt-1">{errors.vehiclePlate}</p>
                 )}
               </div>
+
+              {/* Driver License Number Input */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Driver License Number
+                </label>
+                <input
+                  type="text"
+                  placeholder="Enter driver license number"
+                  value={driverLicenseNumber}
+                  onChange={(e) => {
+                    setDriverLicenseNumber(e.target.value);
+                    setErrors({ ...errors, driverLicenseNumber: '' });
+                  }}
+                  onBlur={(e) => handleFieldBlur('driverLicenseNumber', e.target.value)}
+                  className={`w-full px-4 py-3 border ${errors.driverLicenseNumber ? 'border-red-500' : 'border-gray-300'} rounded-xl focus:outline-none focus:ring-2 ${errors.driverLicenseNumber ? 'focus:ring-red-500' : 'focus:ring-purple-500'} focus:border-transparent transition-all`}
+                />
+                {errors.driverLicenseNumber && (
+                  <p className="text-red-500 text-xs mt-1">{errors.driverLicenseNumber}</p>
+                )}
+              </div>
+
+              {/* Permit Number Input */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Permit Number
+                </label>
+                <input
+                  type="text"
+                  placeholder="Enter permit number"
+                  value={permitNumber}
+                  onChange={(e) => {
+                    setPermitNumber(e.target.value);
+                    setErrors({ ...errors, permitNumber: '' });
+                  }}
+                  onBlur={(e) => handleFieldBlur('permitNumber', e.target.value)}
+                  className={`w-full px-4 py-3 border ${errors.permitNumber ? 'border-red-500' : 'border-gray-300'} rounded-xl focus:outline-none focus:ring-2 ${errors.permitNumber ? 'focus:ring-red-500' : 'focus:ring-purple-500'} focus:border-transparent transition-all`}
+                />
+                {errors.permitNumber && (
+                  <p className="text-red-500 text-xs mt-1">{errors.permitNumber}</p>
+                )}
+              </div>
+
+              {/* ID Card Image Upload */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Upload ID Card Image
+                </label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    setIdCardImage(e.target.files?.[0] || null);
+                    setErrors({ ...errors, idCardImage: '' });
+                  }}
+                  className={`w-full px-4 py-3 border ${errors.idCardImage ? 'border-red-500' : 'border-gray-300'} rounded-xl focus:outline-none focus:ring-2 ${errors.idCardImage ? 'focus:ring-red-500' : 'focus:ring-purple-500'} focus:border-transparent transition-all`}
+                />
+                {idCardImage && <p className="text-green-600 text-xs mt-1">✓ {idCardImage.name}</p>}
+                {errors.idCardImage && (
+                  <p className="text-red-500 text-xs mt-1">{errors.idCardImage}</p>
+                )}
+              </div>
+
+              {/* Driver License Image Upload */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Upload Driver License Image
+                </label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    setDriverLicenseImage(e.target.files?.[0] || null);
+                    setErrors({ ...errors, driverLicenseImage: '' });
+                  }}
+                  className={`w-full px-4 py-3 border ${errors.driverLicenseImage ? 'border-red-500' : 'border-gray-300'} rounded-xl focus:outline-none focus:ring-2 ${errors.driverLicenseImage ? 'focus:ring-red-500' : 'focus:ring-purple-500'} focus:border-transparent transition-all`}
+                />
+                {driverLicenseImage && <p className="text-green-600 text-xs mt-1">✓ {driverLicenseImage.name}</p>}
+                {errors.driverLicenseImage && (
+                  <p className="text-red-500 text-xs mt-1">{errors.driverLicenseImage}</p>
+                )}
+              </div>
+
+              {/* Vehicle Registration Image Upload */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Upload Vehicle Registration Image
+                </label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    setVehicleRegistrationImage(e.target.files?.[0] || null);
+                    setErrors({ ...errors, vehicleRegistrationImage: '' });
+                  }}
+                  className={`w-full px-4 py-3 border ${errors.vehicleRegistrationImage ? 'border-red-500' : 'border-gray-300'} rounded-xl focus:outline-none focus:ring-2 ${errors.vehicleRegistrationImage ? 'focus:ring-red-500' : 'focus:ring-purple-500'} focus:border-transparent transition-all`}
+                />
+                {vehicleRegistrationImage && <p className="text-green-600 text-xs mt-1">✓ {vehicleRegistrationImage.name}</p>}
+                {errors.vehicleRegistrationImage && (
+                  <p className="text-red-500 text-xs mt-1">{errors.vehicleRegistrationImage}</p>
+                )}
+              </div>
             </>
           )}
 
@@ -545,6 +779,29 @@ export function RegisterScreenWithRoles({
           </div>
         </div>
       </div>
+
+      {/* Driver Success Message Modal */}
+      {showSuccessMessage && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md mx-4">
+            <div className="text-center">
+              <div className="text-5xl mb-4">✓</div>
+              <h3 className="text-2xl font-bold text-gray-800 mb-4">Application Submitted</h3>
+              <p className="text-gray-600 mb-6 leading-relaxed">
+                Your application has been submitted successfully.<br /><br />
+                It will be reviewed by GoLocal administration.<br /><br />
+                You will receive approval by email before you can log in.
+              </p>
+              <button 
+                onClick={onLogin}
+                className="w-full bg-gradient-to-r from-purple-600 to-blue-500 text-white py-3 rounded-full text-lg font-semibold shadow-lg hover:shadow-xl transition-shadow"
+              >
+                Return to Login
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Bottom Navigation Bar */}
       <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-t border-gray-200 px-6 py-4">

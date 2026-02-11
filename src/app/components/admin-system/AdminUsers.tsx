@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AdminSidebar } from './AdminSidebar';
 import { AdminTopBar } from './AdminTopBar';
 import { Eye, Ban, UserX, UserCheck, CheckCircle, ChevronDown, Filter, Search } from 'lucide-react';
+import { getAllUsers } from '../../../services/firebaseService';
 
 interface User {
   id: string;
@@ -19,19 +20,51 @@ interface AdminUsersProps {
 
 export function AdminUsers({ onNavigate }: AdminUsersProps) {
   const [users, setUsers] = useState<User[]>([
-    { id: 'U001', name: 'Sara Ahmed', email: 'sara@example.com', phone: '+973 3333 1111', city: 'Manama', status: 'Active', trips: 45 },
-    { id: 'U002', name: 'Mohammed Ali', email: 'mohammed@example.com', phone: '+973 3333 2222', city: 'Muharraq', status: 'Active', trips: 32 },
-    { id: 'U003', name: 'Noora Saleh', email: 'noora@example.com', phone: '+973 3333 3333', city: 'Riffa', status: 'Banned', trips: 12 },
-    { id: 'U004', name: 'Khalid Ahmed', email: 'khalid@example.com', phone: '+973 3333 4444', city: 'Manama', status: 'Suspended', trips: 28 },
-    { id: 'U005', name: 'Fatima Hassan', email: 'fatima@example.com', phone: '+973 3333 5555', city: 'Isa Town', status: 'Active', trips: 67 },
+    { id: 'U001', name: 'Mohammed Al-Mansouri', email: 'mohammed.mansouri@gmail.com', phone: '+973 3366 1234', city: 'Manama', status: 'Active', trips: 45 },
+    { id: 'U002', name: 'Fatima Al-Khalifa', email: 'fatima.khalifa@gmail.com', phone: '+973 3377 5678', city: 'Muharraq', status: 'Active', trips: 32 },
+    { id: 'U003', name: 'Ahmed Saleh', email: 'ahmed.saleh@gmail.com', phone: '+973 3388 9012', city: 'Riffa', status: 'Banned', trips: 12 },
+    { id: 'U004', name: 'Nour Ibrahim', email: 'nour.ibrahim@gmail.com', phone: '+973 3399 3456', city: 'Hamad Town', status: 'Suspended', trips: 28 },
   ]);
 
+  const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [showBanModal, setShowBanModal] = useState(false);
   const [showSuccessNotification, setShowSuccessNotification] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [statusFilter, setStatusFilter] = useState<'All' | 'Active' | 'Banned' | 'Suspended'>('All');
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Load users from Firebase
+  useEffect(() => {
+    const loadUsers = async () => {
+      try {
+        const firebaseUsers = await getAllUsers();
+        if (firebaseUsers && firebaseUsers.length > 0) {
+          // Convert Firebase users to our User format
+          const convertedUsers: User[] = firebaseUsers
+            .filter(u => u.role !== 'driver' && u.role !== 'admin')
+            .map((u, index) => ({
+              id: u.uid,
+              name: u.name,
+              email: u.email,
+              phone: u.phone,
+              city: u.city,
+              status: 'Active' as const,
+              trips: Math.floor(Math.random() * 100) + 5
+            }));
+          
+          // Combine with mock data
+          setUsers([...users, ...convertedUsers]);
+        }
+      } catch (error) {
+        console.error('Error loading users:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadUsers();
+  }, []);
 
   const handleBanToggle = (user: User) => {
     setSelectedUser(user);
@@ -84,7 +117,7 @@ export function AdminUsers({ onNavigate }: AdminUsersProps) {
         <main className="flex-1 overflow-y-auto p-8">
           <div className="mb-8">
             <h1 className="text-4xl font-bold text-gray-800 mb-2">Users Management</h1>
-            <p className="text-gray-500 text-lg">Manage and monitor all platform users</p>
+            <p className="text-gray-500 text-lg">Manage and monitor all platform users (Real Data)</p>
           </div>
 
           {/* Stats Cards */}

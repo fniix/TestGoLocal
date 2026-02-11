@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AdminSidebar } from './AdminSidebar';
 import { AdminTopBar } from './AdminTopBar';
 import { Eye, Ban, UserCheck, CheckCircle, Grid3x3, List, Search, Circle, AlertTriangle, Star } from 'lucide-react';
+import { getAllDrivers } from '../../../services/firebaseService';
 
 interface Driver {
   id: string;
@@ -21,13 +22,14 @@ interface AdminDriversProps {
 
 export function AdminDrivers({ onNavigate }: AdminDriversProps) {
   const [drivers, setDrivers] = useState<Driver[]>([
-    { id: 'D001', name: 'Ahmed Al-Khalifa', email: 'ahmed@example.com', phone: '+973 3333 1111', car: 'Toyota Camry 2022', plate: '12345', status: 'Online', rating: 4.8, trips: 156 },
-    { id: 'D002', name: 'Mohammed Saleh', email: 'mohammed@example.com', phone: '+973 3333 2222', car: 'Honda Accord 2021', plate: '67890', status: 'Busy', rating: 4.9, trips: 203 },
-    { id: 'D003', name: 'Ali Hassan', email: 'ali@example.com', phone: '+973 3333 3333', car: 'Nissan Altima 2023', plate: '54321', status: 'Online', rating: 4.7, trips: 128 },
-    { id: 'D004', name: 'Khalid Ahmed', email: 'khalid@example.com', phone: '+973 3333 4444', car: 'Hyundai Sonata 2022', plate: '98765', status: 'Offline', rating: 4.6, trips: 89 },
-    { id: 'D005', name: 'Youssef Ali', email: 'youssef@example.com', phone: '+973 3333 5555', car: 'Kia Optima 2021', plate: '11223', status: 'Online', rating: 4.9, trips: 245 },
+    { id: 'D001', name: 'Ahmed Al-Khalifa', email: 'ahmed.alkhalifa@golocal.bh', phone: '+973 3355 6789', car: 'Toyota Camry 2022', plate: 'B-45678', status: 'Online', rating: 4.9, trips: 1247 },
+    { id: 'D002', name: 'Mohammed Al-Dosari', email: 'mohammed.dosari@golocal.bh', phone: '+973 3311 2345', car: 'Hyundai Elantra 2023', plate: 'M-12345', status: 'Busy', rating: 4.7, trips: 856 },
+    { id: 'D003', name: 'Salim Al-Hajri', email: 'salim.hajri@golocal.bh', phone: '+973 3322 4567', car: 'Nissan Altima 2022', plate: 'R-98765', status: 'Online', rating: 4.8, trips: 934 },
+    { id: 'D004', name: 'Khalid Al-Mahmoud', email: 'khalid.mahmoud@golocal.bh', phone: '+973 3344 5678', car: 'Kia Forte 2023', plate: 'K-54321', status: 'Offline', rating: 4.6, trips: 723 },
+    { id: 'D005', name: 'Hassan Al-Buainain', email: 'hassan.buainain@golocal.bh', phone: '+973 3366 7890', car: 'Chevrolet Cruze 2021', plate: 'H-77777', status: 'Online', rating: 4.85, trips: 1102 },
   ]);
 
+  const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('table');
   const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
   const [showWarningModal, setShowWarningModal] = useState(false);
@@ -36,6 +38,38 @@ export function AdminDrivers({ onNavigate }: AdminDriversProps) {
   const [successMessage, setSuccessMessage] = useState('');
   const [statusFilter, setStatusFilter] = useState<'All' | 'Online' | 'Offline' | 'Busy'>('All');
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Load drivers from Firebase
+  useEffect(() => {
+    const loadDrivers = async () => {
+      try {
+        const firebaseDrivers = await getAllDrivers();
+        if (firebaseDrivers && firebaseDrivers.length > 0) {
+          // Convert Firebase drivers to our Driver format
+          const convertedDrivers: Driver[] = firebaseDrivers.map((d, index) => ({
+            id: d.uid,
+            name: d.name,
+            email: d.email,
+            phone: d.phone,
+            car: d.vehicleType,
+            plate: d.vehiclePlate,
+            status: ['Online', 'Offline', 'Busy'][index % 3] as 'Online' | 'Offline' | 'Busy',
+            rating: d.rating || 4.8,
+            trips: d.totalTrips || 100
+          }));
+          
+          // Combine with mock data
+          setDrivers([...drivers, ...convertedDrivers]);
+        }
+      } catch (error) {
+        console.error('Error loading drivers:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadDrivers();
+  }, []);
 
   const handleSendWarning = (driver: Driver) => {
     setSelectedDriver(driver);

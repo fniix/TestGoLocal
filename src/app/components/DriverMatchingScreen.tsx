@@ -1,29 +1,57 @@
 import { ArrowLeft, Phone, MessageCircle, X, Star, Navigation, Share2, Shield, Clock, Home, Search, Bell, User as UserIcon, Car } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { getAllDrivers } from '../../services/firebaseService';
+
+interface DriverData {
+  uid: string;
+  name: string;
+  rating: number;
+  totalTrips: number;
+  vehicleType: string;
+  vehiclePlate: string;
+  phone: string;
+}
 
 interface DriverMatchingScreenProps {
   onBack: () => void;
   pickupLocation: string;
   dropoffLocation: string;
   onDriverMatched?: () => void;
+  userCity?: string;
 }
 
-export function DriverMatchingScreen({ onBack, pickupLocation, dropoffLocation, onDriverMatched }: DriverMatchingScreenProps) {
+export function DriverMatchingScreen({ onBack, pickupLocation, dropoffLocation, onDriverMatched, userCity = 'manama' }: DriverMatchingScreenProps) {
   const [isSearching, setIsSearching] = useState(true);
   const [searchProgress, setSearchProgress] = useState(0);
+  const [driverInfo, setDriverInfo] = useState<DriverData | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  // Mock driver data
-  const driverInfo = {
-    name: 'Ahmed Al-Khalifa',
-    photo: '👨‍💼',
-    rating: 4.9,
-    totalTrips: 1247,
-    vehicleMake: 'Toyota Camry',
-    vehicleColor: 'Silver',
-    plateNumber: '45678',
-    estimatedArrival: '3',
-    phone: '+973 3456 7890'
-  };
+  useEffect(() => {
+    // Load drivers from Firebase
+    const loadDrivers = async () => {
+      try {
+        const drivers = await getAllDrivers();
+        if (drivers && drivers.length > 0) {
+          // Get a random driver from available drivers
+          const randomDriver = drivers[Math.floor(Math.random() * drivers.length)];
+          setDriverInfo({
+            uid: randomDriver.uid,
+            name: randomDriver.name,
+            rating: randomDriver.rating || 4.8,
+            totalTrips: randomDriver.totalTrips || 150,
+            vehicleType: randomDriver.vehicleType,
+            vehiclePlate: randomDriver.vehiclePlate,
+            phone: randomDriver.phone
+          });
+        }
+      } catch (error) {
+        console.error('Error loading drivers:', error);
+      }
+      setLoading(false);
+    };
+
+    loadDrivers();
+  }, []);
 
   useEffect(() => {
     // Simulate searching for driver
@@ -40,6 +68,24 @@ export function DriverMatchingScreen({ onBack, pickupLocation, dropoffLocation, 
 
     return () => clearInterval(searchTimer);
   }, []);
+
+  const getVehicleEmoji = (vehicleType: string) => {
+    const type = vehicleType?.toLowerCase() || '';
+    if (type.includes('taxi')) return '🚕';
+    if (type.includes('delivery')) return '🚚';
+    if (type.includes('premium')) return '🚗';
+    return '🚙';
+  };
+
+  // Use mock data if Firebase data is not loaded
+  const displayDriver = driverInfo || {
+    name: 'Ahmed Al-Khalifa',
+    rating: 4.9,
+    totalTrips: 1247,
+    vehicleType: 'Toyota Camry',
+    vehiclePlate: '45678',
+    phone: '+973 3456 7890'
+  };
 
   return (
     <div className="size-full bg-gray-50 flex flex-col">
@@ -165,7 +211,7 @@ export function DriverMatchingScreen({ onBack, pickupLocation, dropoffLocation, 
               </div>
               <div className="flex-1">
                 <h3 className="font-semibold text-green-800">Driver Found!</h3>
-                <p className="text-sm text-green-600">Arriving in {driverInfo.estimatedArrival} minutes</p>
+                <p className="text-sm text-green-600">Arriving in 3 minutes</p>
               </div>
             </div>
 
@@ -174,16 +220,16 @@ export function DriverMatchingScreen({ onBack, pickupLocation, dropoffLocation, 
               <div className="flex items-center gap-4 mb-6">
                 {/* Driver Photo */}
                 <div className="w-20 h-20 bg-gradient-to-br from-purple-100 to-blue-100 rounded-full flex items-center justify-center text-4xl shadow-md">
-                  {driverInfo.photo}
+                  {getVehicleEmoji(displayDriver.vehicleType)}
                 </div>
 
                 {/* Driver Details */}
                 <div className="flex-1">
-                  <h2 className="text-xl font-bold text-gray-800">{driverInfo.name}</h2>
+                  <h2 className="text-xl font-bold text-gray-800">{displayDriver.name}</h2>
                   <div className="flex items-center gap-2 mb-1">
                     <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
-                    <span className="font-semibold text-gray-700">{driverInfo.rating}</span>
-                    <span className="text-sm text-gray-500">({driverInfo.totalTrips} trips)</span>
+                    <span className="font-semibold text-gray-700">{displayDriver.rating.toFixed(1)}</span>
+                    <span className="text-sm text-gray-500">({displayDriver.totalTrips} trips)</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
@@ -209,17 +255,13 @@ export function DriverMatchingScreen({ onBack, pickupLocation, dropoffLocation, 
                   <span className="font-semibold text-gray-800">Vehicle Details</span>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <p className="text-xs text-gray-500 mb-1">Make & Model</p>
-                    <p className="font-medium text-gray-800">{driverInfo.vehicleMake}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 mb-1">Color</p>
-                    <p className="font-medium text-gray-800">{driverInfo.vehicleColor}</p>
+                  <div className="col-span-2">
+                    <p className="text-xs text-gray-500 mb-1">Vehicle Type</p>
+                    <p className="font-medium text-gray-800">{displayDriver.vehicleType}</p>
                   </div>
                   <div className="col-span-2">
                     <p className="text-xs text-gray-500 mb-1">Plate Number</p>
-                    <p className="text-2xl font-bold text-purple-600 tracking-wider">{driverInfo.plateNumber}</p>
+                    <p className="text-2xl font-bold text-purple-600 tracking-wider">{displayDriver.vehiclePlate}</p>
                   </div>
                 </div>
               </div>

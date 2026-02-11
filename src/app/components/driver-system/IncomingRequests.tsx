@@ -1,5 +1,6 @@
 import { Home, FileText, Inbox, Truck, DollarSign, Star, User, Check, X, Clock, MapPin } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { getAllUsers } from '../../../services/firebaseService';
 
 interface IncomingRequestsProps {
   onNavigateToDashboard: () => void;
@@ -39,44 +40,76 @@ export function IncomingRequests({
   const [requests, setRequests] = useState<Request[]>([
     {
       id: '1',
-      customerName: 'Sara Ahmed',
+      customerName: 'Mohammed Al-Mansouri',
       fromCity: 'Manama',
-      fromArea: 'City Center Mall',
+      fromArea: 'City Center',
       toCity: 'Riffa',
-      toArea: 'East Riffa Residential',
-      description: 'Need ride for 2 passengers with 1 luggage',
+      toArea: 'Al Areen Village',
+      description: 'Need ride for 2 passengers with luggage',
       suggestedPrice: 8.5,
-      timeRemaining: 180, // 3 minutes
-      serviceType: 'Private Driver',
+      timeRemaining: 180,
+      serviceType: 'Ride',
       customerRating: 4.8,
     },
     {
       id: '2',
-      customerName: 'Mohammed Ali',
+      customerName: 'Fatima Al-Khalifa',
       fromCity: 'Muharraq',
-      fromArea: 'Airport Terminal',
-      toCity: 'Seef',
-      toArea: 'Seef Mall Entrance',
-      description: 'Airport pickup with 3 suitcases',
+      fromArea: 'Airport',
+      toCity: 'Manama',
+      toArea: 'Juffair',
+      description: 'Airport pickup with 2 suitcases',
       suggestedPrice: 12.0,
-      timeRemaining: 240, // 4 minutes
-      serviceType: 'Private Driver',
+      timeRemaining: 240,
+      serviceType: 'Premium',
       customerRating: 5.0,
     },
     {
       id: '3',
-      customerName: 'Fatima Hassan',
+      customerName: 'Ahmed Saleh',
       fromCity: 'Adliya',
-      fromArea: 'Restaurant District',
-      toCity: 'Juffair',
-      toArea: 'American Alley',
+      fromArea: 'Downtown',
+      toCity: 'Seef',
+      toArea: 'Seef Mall',
       description: 'Quick ride for 1 person',
       suggestedPrice: 4.5,
-      timeRemaining: 120, // 2 minutes
-      serviceType: 'OnTheWay',
+      timeRemaining: 120,
+      serviceType: 'Ride',
       customerRating: 4.6,
     },
   ]);
+
+  // Load real user data from Firebase
+  useEffect(() => {
+    const loadUserData = async () => {
+      try {
+        const users = await getAllUsers();
+        if (users && users.length > 0) {
+          // Create dynamic requests from real users
+          const dynamicRequests = users.map((user, index) => ({
+            id: `req_${index}`,
+            customerName: user.name,
+            fromCity: user.city,
+            fromArea: 'Downtown Area',
+            toCity: 'Manama',
+            toArea: 'City Center',
+            description: 'Ride needed',
+            suggestedPrice: 6.5 + (index * 1.5),
+            timeRemaining: 300 - (index * 50),
+            serviceType: index % 2 === 0 ? 'Ride' : 'Premium',
+            customerRating: 4.5 + (Math.random() * 0.5),
+          }));
+          
+          // Combine mock and real data
+          setRequests([...requests, ...dynamicRequests.slice(0, 2)]);
+        }
+      } catch (error) {
+        console.error('Error loading user data:', error);
+      }
+    };
+
+    loadUserData();
+  }, []);
 
   // Countdown timer effect
   useEffect(() => {

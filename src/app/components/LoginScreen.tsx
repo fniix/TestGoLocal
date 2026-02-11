@@ -7,9 +7,9 @@ import { auth, db } from "../../firebase";
 interface LoginScreenProps {
   onBack: () => void;
   onCreateAccount: () => void;
-  onLogin?: () => void;
-  onLoginAsAdmin?: () => void;
-  onLoginAsDriver?: () => void;
+  onLogin?: (userData: { name: string; email: string; phone: string; city: string }) => void;
+  onLoginAsAdmin?: (userData: { name: string; email: string }) => void;
+  onLoginAsDriver?: (userData: { name: string; email: string; phone: string; city: string; vehicleType: string; vehiclePlate: string }) => void;
   onNavigateHomeAsGuest?: () => void;
   onNavigateProfileAsGuest?: () => void;
 }
@@ -66,20 +66,28 @@ export function LoginScreen({ onBack, onCreateAccount, onLogin, onLoginAsAdmin, 
 
         const data = snap.data();
         const role = data.role?.toLowerCase() || 'user'; // تحويل إلى أحرف صغيرة
+        const userData = {
+          name: data.name,
+          email: data.email,
+          phone: data.phone,
+          city: data.city,
+          vehicleType: data.vehicleType,
+          vehiclePlate: data.vehiclePlate
+        };
 
         if (role === "admin") {
           if (onLoginAsAdmin) {
-            onLoginAsAdmin();
+            onLoginAsAdmin({ name: data.name, email: data.email });
           }
         } 
         else if (role === "driver") {
           if (onLoginAsDriver) {
-            onLoginAsDriver();
+            onLoginAsDriver(userData);
           }
         } 
         else {
           if (onLogin) {
-            onLogin();
+            onLogin(userData);
           }
         }
 
@@ -214,7 +222,11 @@ export function LoginScreen({ onBack, onCreateAccount, onLogin, onLoginAsAdmin, 
           {/* Continue as Guest */}
           <div className="text-center mt-4">
             <button 
-              onClick={onLogin}
+              onClick={() => {
+                if (onLogin) {
+                  onLogin({ name: '', email: '', phone: '', city: 'manama' });
+                }
+              }}
               className="text-sm text-gray-500 hover:text-gray-700 underline"
             >
               Continue as Guest

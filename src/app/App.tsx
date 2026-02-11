@@ -1,4 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from '../firebase';
+import { getUserById } from '../services/firebaseService';
 import { LoginScreen } from './components/LoginScreen';
 import { RegisterScreenWithRoles } from './components/RegisterScreenWithRoles';
 import { HomeScreen } from './components/HomeScreen';
@@ -23,6 +26,7 @@ export default function App() {
   const [userCity, setUserCity] = useState<string>('manama'); // Default to Manama
   const [userPhone, setUserPhone] = useState<string>('+973 3456 7890');
   const [userEmail, setUserEmail] = useState<string>('user@golocal.bh');
+  const [userRole, setUserRole] = useState<string>('');
   const [selectedServiceType, setSelectedServiceType] = useState<string>('');
   const [selectedService, setSelectedService] = useState<string>('');
   const [bookingDetails, setBookingDetails] = useState({ pickup: '', dropoff: '' });
@@ -32,6 +36,34 @@ export default function App() {
   const [isDriver, setIsDriver] = useState<boolean>(false);
   const [vehicleType, setVehicleType] = useState<string>('');
   const [vehiclePlate, setVehiclePlate] = useState<string>('');
+
+  // Check if user is already logged in
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        // User is logged in
+        const userData = await getUserById(user.uid);
+        if (userData) {
+          setUserName(userData.name);
+          setUserEmail(userData.email);
+          setUserPhone(userData.phone);
+          setUserCity(userData.city);
+          setUserRole(userData.role);
+          
+          if (userData.role === 'driver') {
+            setIsDriver(true);
+            setCurrentScreen('driver-system');
+          } else if (userData.role === 'admin') {
+            setCurrentScreen('admin-system');
+          } else {
+            setCurrentScreen('home');
+          }
+        }
+      }
+    });
+
+    return unsubscribe;
+  }, []);
 
   const handleLogout = () => {
     // Clear all user data
@@ -64,16 +96,25 @@ export default function App() {
           setCurrentScreen('splash');
         }}
         onCreateAccount={() => setCurrentScreen('register')}
-        onLogin={() => {
-          setUserName('user123@gmail.com');
+        onLogin={(userData) => {
+          setUserName(userData.name || 'Guest User');
+          setUserEmail(userData.email);
+          setUserPhone(userData.phone);
+          setUserCity(userData.city);
           setCurrentScreen('home');
         }}
-        onLoginAsAdmin={() => {
-          setUserName('admin123@gmail.com');
+        onLoginAsAdmin={(userData) => {
+          setUserName(userData.name);
+          setUserEmail(userData.email);
           setCurrentScreen('admin-system');
         }}
-        onLoginAsDriver={() => {
-          setUserName('driver123@gmail.com');
+        onLoginAsDriver={(userData) => {
+          setUserName(userData.name);
+          setUserEmail(userData.email);
+          setUserPhone(userData.phone);
+          setUserCity(userData.city);
+          setVehicleType(userData.vehicleType);
+          setVehiclePlate(userData.vehiclePlate);
           setIsDriver(true);
           setCurrentScreen('driver-system');
         }}
@@ -211,6 +252,7 @@ export default function App() {
         pickupLocation={bookingDetails.pickup}
         dropoffLocation={bookingDetails.dropoff}
         onDriverMatched={() => setCurrentScreen('live-tracking')}
+        userCity={userCity}
       />
     );
   }

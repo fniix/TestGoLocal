@@ -63,7 +63,7 @@ export function HomeScreen({ onBack, userName, userCity = 'manama', onSelectServ
   };
 
   // Get display name - show "Guest" for unauthenticated users
-  const displayName = isGuest ? 'Guest' : userName.split(' ')[0];
+  const displayName = isGuest ? 'Guest' : (userName.split(' ')[0] || 'User');
 
   // Handle service selection - allow all users to browse services
   const handleServiceClick = (serviceType: string) => {

@@ -56,8 +56,8 @@ export function ProfileScreen({ onBack, userName, userPhone, userEmail, onNaviga
           <EditProfileScreen
             onBack={() => setSelectedScreen(null)}
             userName={userName}
-            userPhone={userPhone || '+973 3456 7890'}
-            userEmail={userEmail || 'user@golocal.bh'}
+            userPhone={userPhone || ''}
+            userEmail={userEmail || ''}
             onSave={(name, phone, email) => {
               if (onUpdateProfile) {
                 onUpdateProfile(name, phone, email);

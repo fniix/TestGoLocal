@@ -1,6 +1,8 @@
 import { ArrowLeft, Bell, Check, Clock, MapPin, Package, Car, Home, Search, User, History, RotateCcw } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityDetailScreen } from './ActivityDetailScreen';
+import { auth } from '../../firebase';
+import { listenForUserOrders } from '../../services/firebaseService';
 
 interface ActivityScreenProps {
   onBack: () => void;
@@ -20,111 +22,61 @@ export function ActivityScreen({ onBack, userName, onNavigateHome, onNavigateSea
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [selectedActivity, setSelectedActivity] = useState<any>(null);
 
-  const activities = [
-    {
-      id: 1,
-      type: 'ride_completed',
-      title: 'Ride Completed',
-      description: 'Your ride to Seef Mall has been completed',
-      time: '5 minutes ago',
-      icon: Check,
-      color: 'bg-green-100 text-green-600',
-      unread: true,
-      rebookable: true,
-      pickup: 'Seef District, Manama',
-      dropoff: 'Seef Mall',
-      serviceType: 'Private Driver'
-    },
-    {
-      id: 2,
-      type: 'payment_success',
-      title: 'Payment Successful',
-      description: 'Payment of BD 7.36 processed successfully',
-      time: '10 minutes ago',
-      icon: Check,
-      color: 'bg-blue-100 text-blue-600',
-      unread: true,
-      rebookable: false
-    },
-    {
-      id: 3,
-      type: 'driver_assigned',
-      title: 'Driver Assigned',
-      description: 'Ahmed Al-Khalifa is on the way to pick you up',
-      time: '2 hours ago',
-      icon: Car,
-      color: 'bg-purple-100 text-purple-600',
-      unread: false,
-      rebookable: false
-    },
-    {
-      id: 4,
-      type: 'booking_confirmed',
-      title: 'Booking Confirmed',
-      description: 'Your ride to Bahrain City Centre has been confirmed',
-      time: '1 day ago',
-      icon: Check,
-      color: 'bg-green-100 text-green-600',
-      unread: false,
-      rebookable: true,
-      pickup: 'Diplomatic Area, Manama',
-      dropoff: 'Bahrain City Centre',
-      serviceType: 'Private Driver'
-    },
-    {
-      id: 5,
-      type: 'delivery_pickup',
-      title: 'Package Picked Up',
-      description: 'Your package from Manama has been picked up',
-      time: '2 days ago',
-      icon: Package,
-      color: 'bg-orange-100 text-orange-600',
-      unread: false,
-      rebookable: true,
-      pickup: 'Manama Souq',
-      dropoff: 'Riffa',
-      serviceType: 'Mandoob'
-    },
-    {
-      id: 6,
-      type: 'delivery_complete',
-      title: 'Delivery Completed',
-      description: 'Package delivered to Riffa successfully',
-      time: '3 days ago',
-      icon: Check,
-      color: 'bg-green-100 text-green-600',
-      unread: false,
-      rebookable: true,
-      pickup: 'Adliya, Manama',
-      dropoff: 'Riffa',
-      serviceType: 'Mandoob'
-    },
-    {
-      id: 7,
-      type: 'promotion',
-      title: 'Special Offer!',
-      description: 'Get 20% off on your next 3 rides this week',
-      time: '3 days ago',
-      icon: Bell,
-      color: 'bg-pink-100 text-pink-600',
-      unread: false,
-      rebookable: false
-    },
-    {
-      id: 8,
-      type: 'ride_scheduled',
-      title: 'Ride Scheduled',
-      description: 'Your ride tomorrow at 9:00 AM is confirmed',
-      time: '4 days ago',
-      icon: Clock,
-      color: 'bg-blue-100 text-blue-600',
-      unread: false,
-      rebookable: true,
-      pickup: 'Budaiya',
-      dropoff: 'Amwaj Islands',
-      serviceType: 'Private Driver'
+  const [activities, setActivities] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) {
+      setActivities([]);
+      setLoading(false);
+      return;
     }
-  ];
+    const unsubscribe = listenForUserOrders(
+      uid,
+      (orders) => {
+        const mapped = orders.map((order) => ({
+          id: order.orderId,
+          type: `order_${order.status}`,
+          title:
+            order.status === 'pending'
+              ? 'Order Pending'
+              : order.status === 'accepted'
+              ? 'Driver Assigned'
+              : order.status === 'rejected'
+              ? 'Order Rejected'
+              : order.status === 'completed'
+              ? 'Ride Completed'
+              : 'Order Cancelled',
+          description: `${order.pickupAddress || 'Pickup'} -> ${order.dropoffAddress || 'Dropoff'}${order.assignedDriverName ? ` • Driver: ${order.assignedDriverName}` : ''}`,
+          time: (order.createdAt as any)?.toDate?.()?.toLocaleString?.() || 'Recent',
+          icon: order.status === 'accepted' ? Car : order.status === 'pending' ? Clock : Check,
+          color:
+            order.status === 'accepted'
+              ? 'bg-purple-100 text-purple-600'
+              : order.status === 'pending'
+              ? 'bg-orange-100 text-orange-600'
+              : order.status === 'rejected'
+              ? 'bg-red-100 text-red-600'
+              : order.status === 'cancelled'
+              ? 'bg-red-100 text-red-600'
+              : 'bg-green-100 text-green-600',
+          unread: order.status === 'pending' || order.status === 'accepted',
+          rebookable: order.status === 'completed' || order.status === 'cancelled',
+          pickup: order.pickupAddress,
+          dropoff: order.dropoffAddress,
+          serviceType: 'Ride',
+        }));
+        setActivities(mapped);
+        setLoading(false);
+      },
+      (error) => {
+        console.error('Failed to load user activity:', error);
+        setLoading(false);
+      }
+    );
+    return unsubscribe;
+  }, []);
 
   const unreadCount = activities.filter(a => a.unread).length;
 
@@ -207,6 +159,13 @@ export function ActivityScreen({ onBack, userName, onNavigateHome, onNavigateSea
                 Create Account
               </button>
             </div>
+          </div>
+        ) : loading ? (
+          <div className="flex flex-col items-center justify-center py-16 px-6">
+            <h3 className="text-2xl font-bold text-gray-800 mb-3 text-center">Loading activity...</h3>
+            <p className="text-gray-600 text-center mb-6 max-w-sm">
+              Syncing your real-time order updates.
+            </p>
           </div>
         ) : (
           <>

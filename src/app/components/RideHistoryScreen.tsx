@@ -1,5 +1,7 @@
 import { ArrowLeft, Calendar, MapPin, DollarSign, Star, RotateCcw, Download, MessageCircle, ChevronRight, Search, Filter, Clock, CheckCircle, XCircle, Home, Bell, User as UserIcon, TrendingUp, Award, History } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { auth } from '../../firebase';
+import { listenForUserOrders } from '../../services/firebaseService';
 
 interface RideHistoryScreenProps {
   onBack: () => void;
@@ -24,7 +26,7 @@ interface Ride {
   driverName: string;
   driverPhoto: string;
   price: number;
-  status: 'completed' | 'cancelled';
+  status: 'completed' | 'cancelled' | 'rejected';
   rating?: number;
   distance: number;
   duration: number;
@@ -36,135 +38,68 @@ export function RideHistoryScreen({ onBack, userName, onNavigateHome, onNavigate
   const [activeTab, setActiveTab] = useState<'completed' | 'cancelled'>('completed');
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
+  const [rides, setRides] = useState<Ride[]>([]);
+  const [loading, setLoading] = useState(true);
 
   // Check if user is a guest (not logged in)
   const isGuest = !userName || userName === '';
 
-  // Mock ride data
-  const rides: Ride[] = [
-    {
-      id: '1',
-      date: 'Today',
-      time: '2:30 PM',
-      pickup: 'Seef District, Manama',
-      dropoff: 'City Centre Bahrain',
-      serviceType: 'Standard Ride',
-      vehicleType: 'Sedan',
-      driverName: 'Ahmed Al-Khalifa',
-      driverPhoto: '👨‍💼',
-      price: 4.50,
-      status: 'completed',
-      rating: 5,
-      distance: 5.2,
-      duration: 18,
-      paymentMethod: 'Credit Card'
-    },
-    {
-      id: '2',
-      date: 'Today',
-      time: '10:15 AM',
-      pickup: 'Diplomatic Area, Manama',
-      dropoff: 'Bahrain International Airport',
-      serviceType: 'Airport Transfer',
-      vehicleType: 'SUV',
-      driverName: 'Mohammed Hassan',
-      driverPhoto: '👨',
-      price: 12.00,
-      status: 'completed',
-      rating: 5,
-      distance: 8.5,
-      duration: 25,
-      paymentMethod: 'Mobile Wallet'
-    },
-    {
-      id: '3',
-      date: 'Yesterday',
-      time: '6:45 PM',
-      pickup: 'Adliya, Manama',
-      dropoff: 'Riffa',
-      serviceType: 'Standard Ride',
-      vehicleType: 'Sedan',
-      driverName: 'Ali Yousif',
-      driverPhoto: '👨‍🦱',
-      price: 8.50,
-      status: 'completed',
-      rating: 4,
-      distance: 12.3,
-      duration: 32,
-      paymentMethod: 'Cash'
-    },
-    {
-      id: '4',
-      date: 'Yesterday',
-      time: '3:20 PM',
-      pickup: 'Juffair, Manama',
-      dropoff: 'Seef Mall',
-      serviceType: 'Standard Ride',
-      vehicleType: 'Sedan',
-      driverName: 'Hassan Ahmed',
-      driverPhoto: '👨‍🦰',
-      price: 3.75,
-      status: 'cancelled',
-      distance: 4.1,
-      duration: 12,
-      paymentMethod: 'Credit Card',
-      cancelReason: 'Driver unavailable'
-    },
-    {
-      id: '5',
-      date: '2 days ago',
-      time: '9:00 AM',
-      pickup: 'Muharraq',
-      dropoff: 'Manama Souq',
-      serviceType: 'Standard Ride',
-      vehicleType: 'Sedan',
-      driverName: 'Omar Khalil',
-      driverPhoto: '👨‍💼',
-      price: 6.25,
-      status: 'completed',
-      rating: 5,
-      distance: 7.8,
-      duration: 22,
-      paymentMethod: 'Mobile Wallet'
-    },
-    {
-      id: '6',
-      date: '3 days ago',
-      time: '7:30 PM',
-      pickup: 'Budaiya',
-      dropoff: 'Amwaj Islands',
-      serviceType: 'Premium Ride',
-      vehicleType: 'Luxury Sedan',
-      driverName: 'Khalid Mahmood',
-      driverPhoto: '👨‍✈️',
-      price: 15.00,
-      status: 'completed',
-      rating: 5,
-      distance: 15.2,
-      duration: 38,
-      paymentMethod: 'Credit Card'
-    },
-    {
-      id: '7',
-      date: '4 days ago',
-      time: '11:45 AM',
-      pickup: 'Salmabad',
-      dropoff: 'Riffa Views',
-      serviceType: 'Standard Ride',
-      vehicleType: 'Sedan',
-      driverName: 'Youssef Ali',
-      driverPhoto: '👨',
-      price: 5.50,
-      status: 'cancelled',
-      distance: 6.5,
-      duration: 18,
-      paymentMethod: 'Cash',
-      cancelReason: 'Changed plans'
+  useEffect(() => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) {
+      setRides([]);
+      setLoading(false);
+      return;
     }
-  ];
+    const unsubscribe = listenForUserOrders(
+      uid,
+      (orders) => {
+        const mappedRides: Ride[] = orders
+          .filter((order) => order.status === 'completed' || order.status === 'cancelled' || order.status === 'rejected')
+          .map((order) => {
+            const createdDate = (order.createdAt as any)?.toDate?.() as Date | undefined;
+            return {
+              id: order.orderId,
+              date: createdDate ? createdDate.toLocaleDateString() : 'Recent',
+              time: createdDate ? createdDate.toLocaleTimeString() : '--',
+              pickup: order.pickupAddress || 'Pickup',
+              dropoff: order.dropoffAddress || 'Dropoff',
+              serviceType: 'Ride',
+              vehicleType: 'Car',
+              driverName: order.assignedDriverName || order.assignedDriverId || 'Unassigned',
+              driverPhoto: '🚗',
+              price: 0,
+              status:
+                order.status === 'completed'
+                  ? 'completed'
+                  : order.status === 'rejected'
+                  ? 'rejected'
+                  : 'cancelled',
+              rating: order.status === 'completed' ? 5 : undefined,
+              distance: 0,
+              duration: 0,
+              paymentMethod: 'N/A',
+              cancelReason:
+                order.status === 'rejected'
+                  ? 'Rejected by driver'
+                  : order.status === 'cancelled'
+                  ? 'Order cancelled by user'
+                  : undefined,
+            };
+          });
+        setRides(mappedRides);
+        setLoading(false);
+      },
+      (error) => {
+        console.error('Failed to load user orders:', error);
+        setLoading(false);
+      }
+    );
+    return unsubscribe;
+  }, []);
 
   const filteredRides = rides
-    .filter(ride => ride.status === activeTab)
+    .filter(ride => (activeTab === 'completed' ? ride.status === 'completed' : ride.status === 'cancelled' || ride.status === 'rejected'))
     .filter(ride => 
       searchQuery === '' ||
       ride.pickup.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -287,7 +222,7 @@ export function RideHistoryScreen({ onBack, userName, onNavigateHome, onNavigate
               <span className={`text-xs px-2 py-0.5 rounded-full ${
                 activeTab === 'cancelled' ? 'bg-white/20' : 'bg-gray-300'
               }`}>
-                {rides.filter(r => r.status === 'cancelled').length}
+                {rides.filter(r => r.status === 'cancelled' || r.status === 'rejected').length}
               </span>
             )}
           </button>
@@ -320,6 +255,11 @@ export function RideHistoryScreen({ onBack, userName, onNavigateHome, onNavigate
                 Create Account
               </button>
             </div>
+          </div>
+        ) : loading ? (
+          <div className="flex flex-col items-center justify-center py-12">
+            <h3 className="text-xl font-bold text-gray-800 mb-2">Loading your rides...</h3>
+            <p className="text-gray-600 text-center">Please wait while we sync your order history.</p>
           </div>
         ) : filteredRides.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12">
@@ -379,7 +319,7 @@ export function RideHistoryScreen({ onBack, userName, onNavigateHome, onNavigate
                               ? 'bg-green-100 text-green-700'
                               : 'bg-red-100 text-red-700'
                           }`}>
-                            {ride.status === 'completed' ? 'Completed' : 'Cancelled'}
+                            {ride.status === 'completed' ? 'Completed' : ride.status === 'rejected' ? 'Rejected' : 'Cancelled'}
                           </span>
                         </div>
                       </div>
@@ -423,7 +363,7 @@ export function RideHistoryScreen({ onBack, userName, onNavigateHome, onNavigate
                     </div>
 
                     {/* Cancel Reason (if cancelled) */}
-                    {ride.status === 'cancelled' && ride.cancelReason && (
+                    {(ride.status === 'cancelled' || ride.status === 'rejected') && ride.cancelReason && (
                       <div className="px-4 py-3 bg-red-50 border-b border-gray-100">
                         <p className="text-xs text-gray-600">
                           <span className="font-semibold">Reason:</span> {ride.cancelReason}

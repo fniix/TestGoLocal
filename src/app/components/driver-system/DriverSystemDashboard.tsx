@@ -1,5 +1,13 @@
 import { Home, FileText, Inbox, Truck, DollarSign, Star, User, Lock, TrendingUp, CreditCard, BarChart3 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { auth } from '../../../firebase';
+import {
+  listenForDriverOrders,
+  listenForPendingOrders,
+  listenToDrivers,
+  listenToUserProfile,
+  updateDriverStatus,
+} from '../../../services/firebaseService';
 
 interface DriverSystemDashboardProps {
   onNavigateToCreateOffer: () => void;
@@ -21,6 +29,92 @@ export function DriverSystemDashboard({
   onNavigateToProfile,
 }: DriverSystemDashboardProps) {
   const [driverStatus, setDriverStatus] = useState<'available' | 'busy' | 'offline'>('available');
+  const [driverName, setDriverName] = useState('Driver');
+  const [rating, setRating] = useState(0);
+  const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
+  const [activeDeliveriesCount, setActiveDeliveriesCount] = useState(0);
+  const [todayEarnings, setTodayEarnings] = useState(0);
+  const [completedCount, setCompletedCount] = useState(0);
+  const [recentActivities, setRecentActivities] = useState<Array<{ action: string; route: string; time: string; type: 'request' | 'completed' | 'offer' | 'payment' }>>([]);
+
+  const userId = auth.currentUser?.uid || '';
+
+  useEffect(() => {
+    if (!userId) return;
+
+    const unProfile = listenToUserProfile(userId, (profile) => {
+      if (!profile) return;
+      setDriverName(profile.name || 'Driver');
+    });
+
+    const unDrivers = listenToDrivers((drivers) => {
+      const me = drivers.find((driver) => driver.driverId === userId);
+      if (me) {
+        setDriverStatus(me.status);
+        setRating(me.rating || 0);
+      }
+    });
+
+    const unPending = listenForPendingOrders((orders) => {
+      setPendingRequestsCount(orders.length);
+      setRecentActivities((previous) => {
+        const pendingActivities = orders.slice(0, 4).map((order) => ({
+          action: 'New request received',
+          route: `${order.pickupAddress || 'Pickup'} -> ${order.dropoffAddress || 'Dropoff'}`,
+          time: 'Live',
+          type: 'request' as const,
+        }));
+        if (pendingActivities.length > 0) return pendingActivities;
+        return previous;
+      });
+    });
+
+    const unAssigned = listenForDriverOrders(userId, (orders) => {
+      const active = orders.filter((order) => order.status === 'accepted').length;
+      const completed = orders.filter((order) => order.status === 'completed').length;
+      setActiveDeliveriesCount(active);
+      setCompletedCount(completed);
+      setTodayEarnings(completed * 2.5);
+
+      const assignedActivities = orders.slice(0, 4).map((order) => ({
+        action:
+          order.status === 'completed'
+            ? 'Delivery completed'
+            : order.status === 'accepted'
+            ? 'Trip assigned'
+            : 'Order update',
+        route: `${order.pickupAddress || 'Pickup'} -> ${order.dropoffAddress || 'Dropoff'}`,
+        time: 'Live',
+        type: order.status === 'completed' ? ('completed' as const) : ('offer' as const),
+      }));
+      if (assignedActivities.length > 0) {
+        setRecentActivities(assignedActivities);
+      }
+    });
+
+    return () => {
+      unProfile();
+      unDrivers();
+      unPending();
+      unAssigned();
+    };
+  }, [userId]);
+
+  const completionRate = useMemo(() => {
+    const total = completedCount + activeDeliveriesCount;
+    if (total === 0) return 0;
+    return Math.round((completedCount / total) * 100);
+  }, [completedCount, activeDeliveriesCount]);
+
+  const handleStatusChange = async (nextStatus: 'available' | 'busy' | 'offline') => {
+    setDriverStatus(nextStatus);
+    if (!userId) return;
+    try {
+      await updateDriverStatus(userId, nextStatus);
+    } catch (error) {
+      console.error('Failed to update driver status:', error);
+    }
+  };
 
   return (
     <div className="size-full flex bg-gray-50">
@@ -66,7 +160,9 @@ export function DriverSystemDashboard({
           >
             <Inbox className="w-5 h-5" />
             Incoming Requests
-            <span className="ml-auto bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">3</span>
+            {pendingRequestsCount > 0 && (
+              <span className="ml-auto bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">{pendingRequestsCount}</span>
+            )}
           </button>
           
           <button 
@@ -75,7 +171,9 @@ export function DriverSystemDashboard({
           >
             <Truck className="w-5 h-5" />
             Active Deliveries
-            <span className="ml-auto bg-green-500 text-white text-xs px-2 py-0.5 rounded-full">2</span>
+            {activeDeliveriesCount > 0 && (
+              <span className="ml-auto bg-green-500 text-white text-xs px-2 py-0.5 rounded-full">{activeDeliveriesCount}</span>
+            )}
           </button>
           
           <button 
@@ -111,7 +209,7 @@ export function DriverSystemDashboard({
             </div>
             <div>
               <p className="font-semibold text-sm">Driver</p>
-              <p className="text-xs text-white/70">Ahmed Al-Khalifa</p>
+              <p className="text-xs text-white/70">{driverName}</p>
             </div>
           </div>
         </div>
@@ -123,14 +221,14 @@ export function DriverSystemDashboard({
         <header className="bg-white border-b border-gray-200 px-8 py-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-800">Welcome, Driver</h1>
+              <h1 className="text-3xl font-bold text-gray-800">Welcome, {driverName}</h1>
               <p className="text-gray-500 mt-1">Manage your deliveries and earnings</p>
             </div>
 
             {/* Status Toggle */}
             <div className="flex items-center gap-3 bg-gray-100 rounded-full p-1.5">
               <button
-                onClick={() => setDriverStatus('available')}
+                onClick={() => handleStatusChange('available')}
                 className={`px-5 py-2.5 rounded-full font-semibold transition-all ${
                   driverStatus === 'available'
                     ? 'bg-green-500 text-white shadow-md'
@@ -140,7 +238,7 @@ export function DriverSystemDashboard({
                 Available
               </button>
               <button
-                onClick={() => setDriverStatus('busy')}
+                onClick={() => handleStatusChange('busy')}
                 className={`px-5 py-2.5 rounded-full font-semibold transition-all ${
                   driverStatus === 'busy'
                     ? 'bg-orange-500 text-white shadow-md'
@@ -150,7 +248,7 @@ export function DriverSystemDashboard({
                 Busy
               </button>
               <button
-                onClick={() => setDriverStatus('offline')}
+                onClick={() => handleStatusChange('offline')}
                 className={`px-5 py-2.5 rounded-full font-semibold transition-all ${
                   driverStatus === 'offline'
                     ? 'bg-gray-500 text-white shadow-md'
@@ -175,7 +273,7 @@ export function DriverSystemDashboard({
                 </div>
               </div>
               <p className="text-gray-500 text-sm mb-1">Active Offers</p>
-              <p className="text-3xl font-bold text-gray-800">12</p>
+              <p className="text-3xl font-bold text-gray-800">0</p>
             </div>
 
             {/* Pending Requests */}
@@ -186,7 +284,7 @@ export function DriverSystemDashboard({
                 </div>
               </div>
               <p className="text-gray-500 text-sm mb-1">Pending Requests</p>
-              <p className="text-3xl font-bold text-gray-800">3</p>
+              <p className="text-3xl font-bold text-gray-800">{pendingRequestsCount}</p>
             </div>
 
             {/* Today's Earnings */}
@@ -197,7 +295,7 @@ export function DriverSystemDashboard({
                 </div>
               </div>
               <p className="text-gray-500 text-sm mb-1">Today's Earnings</p>
-              <p className="text-3xl font-bold text-gray-800">BD 85</p>
+              <p className="text-3xl font-bold text-gray-800">BD {todayEarnings.toFixed(2)}</p>
             </div>
 
             {/* Rating */}
@@ -209,7 +307,7 @@ export function DriverSystemDashboard({
               </div>
               <p className="text-gray-500 text-sm mb-1">Rating</p>
               <div className="flex items-center gap-1">
-                <p className="text-3xl font-bold text-gray-800">4.9</p>
+                <p className="text-3xl font-bold text-gray-800">{rating.toFixed(1)}</p>
                 <Star className="w-5 h-5 text-yellow-500 fill-yellow-500" />
               </div>
             </div>
@@ -222,7 +320,7 @@ export function DriverSystemDashboard({
                 </div>
               </div>
               <p className="text-gray-500 text-sm mb-1">Completion Rate</p>
-              <p className="text-3xl font-bold text-gray-800">98%</p>
+              <p className="text-3xl font-bold text-gray-800">{completionRate}%</p>
             </div>
           </div>
 
@@ -255,7 +353,7 @@ export function DriverSystemDashboard({
                   </div>
                   <div className="text-left">
                     <p className="font-bold text-lg text-gray-800">View My Offers</p>
-                    <p className="text-sm text-gray-500">Manage 12 active offers</p>
+                    <p className="text-sm text-gray-500">Manage your live offers</p>
                   </div>
                 </div>
               </button>
@@ -270,7 +368,7 @@ export function DriverSystemDashboard({
                   </div>
                   <div className="text-left">
                     <p className="font-bold text-lg text-gray-800">Check Requests</p>
-                    <p className="text-sm text-gray-500">3 pending requests</p>
+                    <p className="text-sm text-gray-500">{pendingRequestsCount} pending requests</p>
                   </div>
                 </div>
               </button>
@@ -339,12 +437,9 @@ export function DriverSystemDashboard({
             <h2 className="text-xl font-bold text-gray-800 mb-4">Recent Activity</h2>
             <div className="bg-white rounded-2xl shadow-md border border-gray-100">
               <div className="divide-y divide-gray-100">
-                {[
-                  { action: 'New request received', customer: 'Sara Ahmed', route: 'Manama → Riffa', time: '5 min ago', type: 'request' },
-                  { action: 'Delivery completed', customer: 'Mohammed Ali', route: 'Muharraq → Seef', time: '1 hour ago', type: 'completed' },
-                  { action: 'Offer published', customer: null, route: 'Manama → Hamad Town', time: '2 hours ago', type: 'offer' },
-                  { action: 'Payment received', customer: 'Fatima Hassan', route: 'Adliya → Sitra', time: '3 hours ago', type: 'payment' },
-                ].map((activity, index) => (
+                {recentActivities.length === 0 ? (
+                  <div className="p-5 text-sm text-gray-500">No recent order activity yet.</div>
+                ) : recentActivities.map((activity, index) => (
                   <div key={index} className="p-5 hover:bg-gray-50 transition-colors">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">
@@ -361,9 +456,7 @@ export function DriverSystemDashboard({
                         </div>
                         <div>
                           <p className="font-semibold text-gray-800">{activity.action}</p>
-                          <p className="text-sm text-gray-500">
-                            {activity.customer && `${activity.customer} • `}{activity.route}
-                          </p>
+                          <p className="text-sm text-gray-500">{activity.route}</p>
                         </div>
                       </div>
                       <p className="text-sm text-gray-400">{activity.time}</p>

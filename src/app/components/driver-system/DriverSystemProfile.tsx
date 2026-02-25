@@ -1,4 +1,7 @@
 import { Home, FileText, Inbox, Truck, DollarSign, Star, User, Phone, Mail, MapPin, Car, Shield, Lock, TrendingUp, CreditCard, BarChart3 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { auth } from '../../../firebase';
+import { listenForDriverOrders, listenForPendingOrders, listenToDrivers, listenToUserProfile } from '../../../services/firebaseService';
 
 interface DriverSystemProfileProps {
   onNavigateToDashboard: () => void;
@@ -17,6 +20,59 @@ export function DriverSystemProfile({
   onNavigateToEarnings,
   onNavigateToReviews,
 }: DriverSystemProfileProps) {
+  const [driverName, setDriverName] = useState('Driver');
+  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
+  const [city, setCity] = useState('');
+  const [carType, setCarType] = useState('');
+  const [rating, setRating] = useState(0);
+  const [completedDeliveries, setCompletedDeliveries] = useState(0);
+  const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
+  const [activeDeliveriesCount, setActiveDeliveriesCount] = useState(0);
+  const userId = auth.currentUser?.uid || '';
+
+  useEffect(() => {
+    if (!userId) return;
+
+    const unProfile = listenToUserProfile(userId, (profile) => {
+      if (!profile) return;
+      setDriverName(profile.name || 'Driver');
+      setPhone(profile.phone || '');
+      setEmail(profile.email || '');
+      setCity(profile.city || '');
+    });
+
+    const unDrivers = listenToDrivers((drivers) => {
+      const me = drivers.find((driver) => driver.driverId === userId);
+      if (!me) return;
+      setCarType(me.carType || '');
+      setRating(me.rating || 0);
+    });
+
+    const unOrders = listenForDriverOrders(userId, (orders) => {
+      const completed = orders.filter((order) => order.status === 'completed').length;
+      const active = orders.filter((order) => order.status === 'accepted').length;
+      setCompletedDeliveries(completed);
+      setActiveDeliveriesCount(active);
+    });
+
+    const unPending = listenForPendingOrders((orders) => {
+      setPendingRequestsCount(orders.length);
+    });
+
+    return () => {
+      unProfile();
+      unDrivers();
+      unOrders();
+      unPending();
+    };
+  }, [userId]);
+
+  const initials = useMemo(() => {
+    if (!driverName) return 'D';
+    return driverName.charAt(0).toUpperCase();
+  }, [driverName]);
+
   return (
     <div className="size-full flex bg-gray-50">
       {/* Fixed Left Sidebar */}
@@ -64,7 +120,9 @@ export function DriverSystemProfile({
           >
             <Inbox className="w-5 h-5" />
             Incoming Requests
-            <span className="ml-auto bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">3</span>
+            {pendingRequestsCount > 0 && (
+              <span className="ml-auto bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">{pendingRequestsCount}</span>
+            )}
           </button>
           
           <button 
@@ -73,7 +131,9 @@ export function DriverSystemProfile({
           >
             <Truck className="w-5 h-5" />
             Active Deliveries
-            <span className="ml-auto bg-green-500 text-white text-xs px-2 py-0.5 rounded-full">2</span>
+            {activeDeliveriesCount > 0 && (
+              <span className="ml-auto bg-green-500 text-white text-xs px-2 py-0.5 rounded-full">{activeDeliveriesCount}</span>
+            )}
           </button>
           
           <button 
@@ -106,7 +166,7 @@ export function DriverSystemProfile({
             </div>
             <div>
               <p className="font-semibold text-sm">Driver</p>
-              <p className="text-xs text-white/70">Ahmed Al-Khalifa</p>
+              <p className="text-xs text-white/70">{driverName}</p>
             </div>
           </div>
         </div>
@@ -129,17 +189,17 @@ export function DriverSystemProfile({
             <div className="bg-gradient-to-r from-purple-600 to-blue-500 rounded-2xl p-8 mb-6 shadow-lg">
               <div className="flex items-center gap-6">
                 <div className="w-24 h-24 rounded-full bg-white flex items-center justify-center shadow-xl">
-                  <span className="text-purple-600 font-bold text-4xl">A</span>
+                  <span className="text-purple-600 font-bold text-4xl">{initials}</span>
                 </div>
                 <div className="flex-1">
-                  <h2 className="text-3xl font-bold text-white mb-2">Ahmed Al-Khalifa</h2>
+                  <h2 className="text-3xl font-bold text-white mb-2">{driverName}</h2>
                   <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2 bg-white/20 px-4 py-2 rounded-full">
                       <Star className="w-5 h-5 text-yellow-300 fill-yellow-300" />
-                      <span className="text-white font-semibold">4.9 Rating</span>
+                      <span className="text-white font-semibold">{rating.toFixed(1)} Rating</span>
                     </div>
                     <div className="bg-white/20 px-4 py-2 rounded-full">
-                      <span className="text-white font-semibold">342 Deliveries</span>
+                      <span className="text-white font-semibold">{completedDeliveries} Deliveries</span>
                     </div>
                   </div>
                 </div>
@@ -158,7 +218,7 @@ export function DriverSystemProfile({
                   <label className="text-xs text-gray-500 mb-2 block">Full Name</label>
                   <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
                     <User className="w-5 h-5 text-gray-400" />
-                    <span className="text-gray-800 font-semibold">Ahmed Al-Khalifa</span>
+                    <span className="text-gray-800 font-semibold">{driverName}</span>
                   </div>
                 </div>
 
@@ -166,7 +226,7 @@ export function DriverSystemProfile({
                   <label className="text-xs text-gray-500 mb-2 block">Phone Number</label>
                   <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
                     <Phone className="w-5 h-5 text-gray-400" />
-                    <span className="text-gray-800 font-semibold">+973 3456 7890</span>
+                    <span className="text-gray-800 font-semibold">{phone || '-'}</span>
                   </div>
                 </div>
 
@@ -174,7 +234,7 @@ export function DriverSystemProfile({
                   <label className="text-xs text-gray-500 mb-2 block">Email Address</label>
                   <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
                     <Mail className="w-5 h-5 text-gray-400" />
-                    <span className="text-gray-800 font-semibold">ahmed.alkhalifa@example.com</span>
+                    <span className="text-gray-800 font-semibold">{email || '-'}</span>
                   </div>
                 </div>
 
@@ -182,7 +242,7 @@ export function DriverSystemProfile({
                   <label className="text-xs text-gray-500 mb-2 block">City</label>
                   <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
                     <MapPin className="w-5 h-5 text-gray-400" />
-                    <span className="text-gray-800 font-semibold">Manama</span>
+                    <span className="text-gray-800 font-semibold">{city || '-'}</span>
                   </div>
                 </div>
               </div>
@@ -200,7 +260,7 @@ export function DriverSystemProfile({
                   <label className="text-xs text-gray-500 mb-2 block">Vehicle Type</label>
                   <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
                     <Car className="w-5 h-5 text-gray-400" />
-                    <span className="text-gray-800 font-semibold">Sedan</span>
+                    <span className="text-gray-800 font-semibold">{carType || '-'}</span>
                   </div>
                 </div>
 

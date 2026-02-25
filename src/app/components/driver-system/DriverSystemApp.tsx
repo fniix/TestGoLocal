@@ -1,4 +1,7 @@
 import { useState } from 'react';
+import { ChevronDown, ChevronUp, LogOut, User } from 'lucide-react';
+import { signOut } from 'firebase/auth';
+import { auth } from '../../../firebase';
 import { DriverLandingPage } from './DriverLandingPage';
 import { DriverSystemDashboard } from './DriverSystemDashboard';
 import { CreateDeliveryOffer } from './CreateDeliveryOffer';
@@ -12,6 +15,16 @@ import { DriverSystemProfile } from './DriverSystemProfile';
 export function DriverSystemApp() {
   const [currentPage, setCurrentPage] = useState<'landing' | 'dashboard' | 'create-offer' | 'my-offers' | 'incoming-requests' | 'active-deliveries' | 'delivery-completed' | 'earnings' | 'reviews' | 'profile'>('landing');
   const [driverStatus, setDriverStatus] = useState<'available' | 'busy' | 'offline'>('available');
+  const [showAccountMenu, setShowAccountMenu] = useState(false);
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error('Failed to logout:', error);
+      alert('Failed to logout. Please try again.');
+    }
+  };
 
   // Landing Page
   if (currentPage === 'landing') {
@@ -22,9 +35,11 @@ export function DriverSystemApp() {
     );
   }
 
+  let currentView: any = null;
+
   // Dashboard
   if (currentPage === 'dashboard') {
-    return (
+    currentView = (
       <DriverSystemDashboard 
         onNavigateToCreateOffer={() => setCurrentPage('create-offer')}
         onNavigateToMyOffers={() => setCurrentPage('my-offers')}
@@ -39,7 +54,7 @@ export function DriverSystemApp() {
 
   // Create Delivery Offer
   if (currentPage === 'create-offer') {
-    return (
+    currentView = (
       <CreateDeliveryOffer 
         onBack={() => setCurrentPage('dashboard')}
         onNavigateToDashboard={() => setCurrentPage('dashboard')}
@@ -55,7 +70,7 @@ export function DriverSystemApp() {
 
   // My Offers
   if (currentPage === 'my-offers') {
-    return (
+    currentView = (
       <MyOffers 
         onNavigateToDashboard={() => setCurrentPage('dashboard')}
         onNavigateToCreateOffer={() => setCurrentPage('create-offer')}
@@ -70,7 +85,7 @@ export function DriverSystemApp() {
 
   // Incoming Requests
   if (currentPage === 'incoming-requests') {
-    return (
+    currentView = (
       <IncomingRequests 
         onNavigateToDashboard={() => setCurrentPage('dashboard')}
         onNavigateToMyOffers={() => setCurrentPage('my-offers')}
@@ -86,7 +101,7 @@ export function DriverSystemApp() {
 
   // Delivery Completed
   if (currentPage === 'delivery-completed') {
-    return (
+    currentView = (
       <DeliveryCompleted 
         onNavigateToDashboard={() => setCurrentPage('dashboard')}
         onNavigateToMyOffers={() => setCurrentPage('my-offers')}
@@ -101,7 +116,7 @@ export function DriverSystemApp() {
 
   // Earnings
   if (currentPage === 'earnings') {
-    return (
+    currentView = (
       <Earnings 
         onNavigateToDashboard={() => setCurrentPage('dashboard')}
         onNavigateToMyOffers={() => setCurrentPage('my-offers')}
@@ -115,7 +130,7 @@ export function DriverSystemApp() {
 
   // Reviews
   if (currentPage === 'reviews') {
-    return (
+    currentView = (
       <Reviews 
         onNavigateToDashboard={() => setCurrentPage('dashboard')}
         onNavigateToMyOffers={() => setCurrentPage('my-offers')}
@@ -129,7 +144,7 @@ export function DriverSystemApp() {
 
   // Profile
   if (currentPage === 'profile') {
-    return (
+    currentView = (
       <DriverSystemProfile 
         onNavigateToDashboard={() => setCurrentPage('dashboard')}
         onNavigateToMyOffers={() => setCurrentPage('my-offers')}
@@ -144,7 +159,7 @@ export function DriverSystemApp() {
   // Active Deliveries - placeholder for now  
   if (currentPage === 'active-deliveries') {
     // Simulate a completed delivery scenario
-    return (
+    currentView = (
       <DeliveryCompleted 
         onNavigateToDashboard={() => setCurrentPage('dashboard')}
         onNavigateToMyOffers={() => setCurrentPage('my-offers')}
@@ -157,5 +172,42 @@ export function DriverSystemApp() {
     );
   }
 
-  return null;
+  if (!currentView) return null;
+
+  return (
+    <div className="relative size-full">
+      {currentView}
+      {currentPage !== 'landing' && (
+        <>
+          <div className="fixed bottom-0 left-0 z-50 w-64 bg-gradient-to-b from-purple-600 to-blue-600 border-t border-white/10 px-6 py-4">
+            <button
+              onClick={() => setShowAccountMenu((prev) => !prev)}
+              className="flex w-full items-center gap-3 rounded-xl bg-white/10 px-3 py-2 text-white hover:bg-white/20 transition-colors"
+            >
+              <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
+                <User className="w-5 h-5 text-white" />
+              </div>
+              <div className="flex-1 text-left">
+                <p className="font-semibold text-sm">Driver</p>
+                <p className="text-xs text-white/70">Account</p>
+              </div>
+              {showAccountMenu ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </button>
+          </div>
+
+          {showAccountMenu && (
+            <div className="fixed bottom-24 left-4 z-[60] w-56 rounded-xl bg-white shadow-2xl border border-gray-200 overflow-hidden">
+              <button
+                onClick={handleLogout}
+                className="flex w-full items-center gap-2 px-4 py-3 text-sm font-semibold text-red-600 hover:bg-red-50 transition-colors"
+              >
+                <LogOut className="h-4 w-4" />
+                Logout
+              </button>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
 }

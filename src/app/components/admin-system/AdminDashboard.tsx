@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AdminSidebar } from './AdminSidebar';
 import { AdminTopBar } from './AdminTopBar';
 import { Users, Car, Navigation, Package, TrendingUp, TrendingDown, MapPin, User, Phone, X, CheckCircle, AlertTriangle, DollarSign, MessageSquare, Plus, Bell, Ban, Crosshair, ZoomIn, Clock, Wifi, CreditCard, Truck, Server, Activity, Globe, Zap, FileText, Moon, ChevronDown } from 'lucide-react';
+import { listenForAllDrivers, listenForAllOrders, listenForAllUsers } from '../../../services/firebaseService';
 
 interface AdminDashboardProps {
   onNavigate: (page: 'dashboard' | 'users' | 'drivers' | 'trips' | 'delivery' | 'payments' | 'complaints' | 'violations' | 'reports' | 'notifications' | 'settings') => void;
@@ -34,11 +35,29 @@ export function AdminDashboard({ onNavigate }: AdminDashboardProps) {
   const [selectedMarker, setSelectedMarker] = useState<MapMarker | null>(null);
   const [hoveredMarker, setHoveredMarker] = useState<MapMarker | null>(null);
   const [showQuickActions, setShowQuickActions] = useState(false);
+  const [totalUsersCount, setTotalUsersCount] = useState(0);
+  const [totalDriversCount, setTotalDriversCount] = useState(0);
+  const [totalOrdersCount, setTotalOrdersCount] = useState(0);
+  const [pendingOrdersCount, setPendingOrdersCount] = useState(0);
+
+  useEffect(() => {
+    const unUsers = listenForAllUsers((users) => setTotalUsersCount(users.length));
+    const unDrivers = listenForAllDrivers((drivers) => setTotalDriversCount(drivers.length));
+    const unOrders = listenForAllOrders((orders) => {
+      setTotalOrdersCount(orders.length);
+      setPendingOrdersCount(orders.filter((order) => order.status === 'pending').length);
+    });
+    return () => {
+      unUsers();
+      unDrivers();
+      unOrders();
+    };
+  }, []);
 
   const stats = [
     { 
       title: 'Total Users', 
-      value: '1,248', 
+      value: String(totalUsersCount), 
       change: '+12%',
       trend: 'up',
       icon: Users, 
@@ -47,7 +66,7 @@ export function AdminDashboard({ onNavigate }: AdminDashboardProps) {
     },
     { 
       title: 'Active Drivers', 
-      value: '89', 
+      value: String(totalDriversCount), 
       change: '+8%',
       trend: 'up',
       icon: Car, 
@@ -55,8 +74,8 @@ export function AdminDashboard({ onNavigate }: AdminDashboardProps) {
       miniData: [10, 15, 12, 20, 18, 25, 28]
     },
     { 
-      title: 'Total Trips', 
-      value: '3,421', 
+      title: 'Total Orders', 
+      value: String(totalOrdersCount), 
       change: '+15%',
       trend: 'up',
       icon: Navigation, 
@@ -64,8 +83,8 @@ export function AdminDashboard({ onNavigate }: AdminDashboardProps) {
       miniData: [40, 55, 48, 60, 52, 58, 65]
     },
     { 
-      title: 'Deliveries', 
-      value: '567', 
+      title: 'Pending Orders', 
+      value: String(pendingOrdersCount), 
       change: '+15%',
       trend: 'up',
       icon: Package, 

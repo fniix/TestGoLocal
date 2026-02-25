@@ -1,6 +1,6 @@
 import { Home, FileText, Inbox, Truck, DollarSign, Star, User, Check, X, Clock, MapPin } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { getAllUsers } from '../../../services/firebaseService';
+import { acceptOrder, listenPendingOrdersForDrivers, rejectOrder } from '../../../services/firebaseService';
 
 interface IncomingRequestsProps {
   onNavigateToDashboard: () => void;
@@ -22,7 +22,7 @@ interface Request {
   toArea: string;
   description: string;
   suggestedPrice: number;
-  timeRemaining: number; // in seconds
+  timeRemaining: number;
   serviceType: string;
   customerRating: number;
 }
@@ -37,78 +37,36 @@ export function IncomingRequests({
   onNavigateToProfile,
   driverStatus,
 }: IncomingRequestsProps) {
-  const [requests, setRequests] = useState<Request[]>([
-    {
-      id: '1',
-      customerName: 'Mohammed Al-Mansouri',
-      fromCity: 'Manama',
-      fromArea: 'City Center',
-      toCity: 'Riffa',
-      toArea: 'Al Areen Village',
-      description: 'Need ride for 2 passengers with luggage',
-      suggestedPrice: 8.5,
-      timeRemaining: 180,
-      serviceType: 'Ride',
-      customerRating: 4.8,
-    },
-    {
-      id: '2',
-      customerName: 'Fatima Al-Khalifa',
-      fromCity: 'Muharraq',
-      fromArea: 'Airport',
-      toCity: 'Manama',
-      toArea: 'Juffair',
-      description: 'Airport pickup with 2 suitcases',
-      suggestedPrice: 12.0,
-      timeRemaining: 240,
-      serviceType: 'Premium',
-      customerRating: 5.0,
-    },
-    {
-      id: '3',
-      customerName: 'Ahmed Saleh',
-      fromCity: 'Adliya',
-      fromArea: 'Downtown',
-      toCity: 'Seef',
-      toArea: 'Seef Mall',
-      description: 'Quick ride for 1 person',
-      suggestedPrice: 4.5,
-      timeRemaining: 120,
-      serviceType: 'Ride',
-      customerRating: 4.6,
-    },
-  ]);
+  const [requests, setRequests] = useState<Request[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  // Load real user data from Firebase
   useEffect(() => {
-    const loadUserData = async () => {
-      try {
-        const users = await getAllUsers();
-        if (users && users.length > 0) {
-          // Create dynamic requests from real users
-          const dynamicRequests = users.map((user, index) => ({
-            id: `req_${index}`,
-            customerName: user.name,
-            fromCity: user.city,
-            fromArea: 'Downtown Area',
-            toCity: 'Manama',
-            toArea: 'City Center',
-            description: 'Ride needed',
-            suggestedPrice: 6.5 + (index * 1.5),
-            timeRemaining: 300 - (index * 50),
-            serviceType: index % 2 === 0 ? 'Ride' : 'Premium',
-            customerRating: 4.5 + (Math.random() * 0.5),
-          }));
-          
-          // Combine mock and real data
-          setRequests([...requests, ...dynamicRequests.slice(0, 2)]);
-        }
-      } catch (error) {
-        console.error('Error loading user data:', error);
+    const unsubscribe = listenPendingOrdersForDrivers(
+      (orders) => {
+        const mappedRequests: Request[] = orders.map((order) => ({
+          id: order.orderId,
+          customerName: order.userName || 'User',
+          fromCity: order.pickupAddress || 'Pickup',
+          fromArea: `Lat ${order.pickupLocation.lat.toFixed(3)}, Lng ${order.pickupLocation.lng.toFixed(3)}`,
+          toCity: order.dropoffAddress || 'Dropoff',
+          toArea: `Lat ${order.dropoffLocation.lat.toFixed(3)}, Lng ${order.dropoffLocation.lng.toFixed(3)}`,
+          description: `Order from ${order.userPhone} • ${order.createdAt ? 'Live now' : ''}`,
+          suggestedPrice: 0,
+          timeRemaining: 300,
+          serviceType: 'Ride',
+          customerRating: 5,
+        }));
+        setRequests(mappedRequests);
+        setLoading(false);
+      },
+      (snapshotError) => {
+        console.error('Error loading pending orders:', snapshotError);
+        setError('Unable to load incoming requests.');
+        setLoading(false);
       }
-    };
-
-    loadUserData();
+    );
+    return unsubscribe;
   }, []);
 
   // Countdown timer effect
@@ -131,18 +89,26 @@ export function IncomingRequests({
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const handleAccept = (id: string) => {
+  const handleAccept = async (id: string) => {
     const request = requests.find(r => r.id === id);
     if (request) {
-      alert(`Request accepted from ${request.customerName}!\nYou will be redirected to Active Deliveries.`);
-      setRequests(requests.filter(r => r.id !== id));
-      // In a real app, this would navigate to Active Deliveries
+      try {
+        await acceptOrder(id);
+        alert(`Request accepted from ${request.customerName}.`);
+      } catch (acceptError) {
+        console.error('Failed to accept request:', acceptError);
+        alert('Failed to accept request.');
+      }
     }
   };
 
-  const handleReject = (id: string) => {
+  const handleReject = async (id: string) => {
     if (confirm('Are you sure you want to reject this request?')) {
-      setRequests(requests.filter(r => r.id !== id));
+      try {
+        await rejectOrder(id);
+      } catch (rejectError) {
+        console.error('Failed to reject request:', rejectError);
+      }
     }
   };
 
@@ -292,7 +258,17 @@ export function IncomingRequests({
           )}
 
           {/* Requests List */}
-          {driverStatus === 'available' && requests.length > 0 ? (
+          {loading ? (
+            <div className="bg-white rounded-2xl shadow-md border border-gray-100 p-12 text-center">
+              <h3 className="text-xl font-bold text-gray-800 mb-2">Loading incoming requests...</h3>
+              <p className="text-gray-500">Listening for pending orders in real-time.</p>
+            </div>
+          ) : error ? (
+            <div className="bg-red-50 border-2 border-red-200 rounded-2xl p-6 mb-6">
+              <h3 className="font-bold text-red-900 text-lg mb-1">Failed to load requests</h3>
+              <p className="text-red-800 text-sm">{error}</p>
+            </div>
+          ) : driverStatus === 'available' && requests.length > 0 ? (
             <div className="space-y-4">
               {requests.map((request) => (
                 <div

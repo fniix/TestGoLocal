@@ -1,8 +1,8 @@
 import { ArrowLeft } from 'lucide-react';
 import { useState } from 'react';
 import { createUserWithEmailAndPassword } from "firebase/auth";
-import { setDoc, doc, serverTimestamp } from "firebase/firestore";
-import { auth, db } from "../../firebase";
+import { auth } from "../../firebase";
+import { createDriverProfile, createUserProfile } from "../../services/firebaseService";
 
 interface RegisterScreenWithRolesProps {
   onBack: () => void;
@@ -232,14 +232,13 @@ export function RegisterScreenWithRoles({
   const registerPassenger = async (emailValue: string, passwordValue: string, nameValue: string, cityValue: string, phoneValue: string) => {
     try {
       const cred = await createUserWithEmailAndPassword(auth, emailValue, passwordValue);
-
-      await setDoc(doc(db, "users", cred.user.uid), {
+      await createUserProfile({
+        uid: cred.user.uid,
         role: "user",
         name: nameValue,
         email: emailValue,
         phone: phoneValue,
         city: cityValue,
-        createdAt: serverTimestamp(),
       });
 
       if (onRegisterPassenger) {
@@ -262,18 +261,24 @@ export function RegisterScreenWithRoles({
   ) => {
     try {
       const cred = await createUserWithEmailAndPassword(auth, emailValue, passwordValue);
-
-      await setDoc(doc(db, "users", cred.user.uid), {
+      await createUserProfile({
+        uid: cred.user.uid,
         role: "driver",
-        status: "pending",
         name: nameValue,
         email: emailValue,
+        phone: phoneNumber,
         city: cityValue,
-        vehicleType: vehicleTypeValue,
-        plate: plateValue,
-        license: licenseValue,
-        permit: permitValue,
-        createdAt: serverTimestamp(),
+        extra: {
+          vehicleType: vehicleTypeValue,
+          vehiclePlate: plateValue,
+        },
+      });
+      await createDriverProfile({
+        driverId: cred.user.uid,
+        name: nameValue,
+        phone: phoneNumber,
+        carType: vehicleTypeValue,
+        status: "offline",
       });
 
       alert("Your application has been submitted successfully. It will be reviewed by GoLocal administration.");

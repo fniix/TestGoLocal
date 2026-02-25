@@ -1,7 +1,11 @@
 import { useState, useEffect } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../firebase';
-import { getUserById } from '../services/firebaseService';
+import {
+  createOrder,
+  listenToUserProfile,
+  updateUserProfile,
+} from '../services/firebaseService';
 import { LoginScreen } from './components/LoginScreen';
 import { RegisterScreenWithRoles } from './components/RegisterScreenWithRoles';
 import { HomeScreen } from './components/HomeScreen';
@@ -23,10 +27,11 @@ import { AdminSystemApp } from './components/admin-system/AdminSystemApp';
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<'splash' | 'login' | 'register' | 'home' | 'search' | 'activity' | 'service-selection' | 'booking-details' | 'driver-matching' | 'live-tracking' | 'payment' | 'rating' | 'ride-history' | 'profile' | 'driver-dashboard' | 'driver-profile' | 'driver-system' | 'admin-system'>('splash');
   const [userName, setUserName] = useState<string>('');
-  const [userCity, setUserCity] = useState<string>('manama'); // Default to Manama
-  const [userPhone, setUserPhone] = useState<string>('+973 3456 7890');
-  const [userEmail, setUserEmail] = useState<string>('user@golocal.bh');
-  const [userRole, setUserRole] = useState<string>('');
+  const [userCity, setUserCity] = useState<string>('');
+  const [userPhone, setUserPhone] = useState<string>('');
+  const [userEmail, setUserEmail] = useState<string>('');
+  const [currentUserId, setCurrentUserId] = useState<string>('');
+  const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
   const [selectedServiceType, setSelectedServiceType] = useState<string>('');
   const [selectedService, setSelectedService] = useState<string>('');
   const [bookingDetails, setBookingDetails] = useState({ pickup: '', dropoff: '' });
@@ -39,38 +44,63 @@ export default function App() {
 
   // Check if user is already logged in
   useEffect(() => {
+    let profileUnsubscribe: (() => void) | null = null;
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        // User is logged in
-        const userData = await getUserById(user.uid);
-        if (userData) {
-          setUserName(userData.name);
-          setUserEmail(userData.email);
-          setUserPhone(userData.phone);
-          setUserCity(userData.city);
-          setUserRole(userData.role);
-          
-          if (userData.role === 'driver') {
-            setIsDriver(true);
-            setCurrentScreen('driver-system');
-          } else if (userData.role === 'admin') {
-            setCurrentScreen('admin-system');
-          } else {
-            setCurrentScreen('home');
+        setCurrentUserId(user.uid);
+        profileUnsubscribe?.();
+        profileUnsubscribe = listenToUserProfile(
+          user.uid,
+          (userData) => {
+            if (!userData) {
+              return;
+            }
+            setUserName(userData.name || '');
+            setUserEmail(userData.email || '');
+            setUserPhone(userData.phone || '');
+            setUserCity(userData.city || '');
+
+            if (userData.role === 'driver') {
+              setIsDriver(true);
+              setCurrentScreen('driver-system');
+            } else if (userData.role === 'admin') {
+              setCurrentScreen('admin-system');
+            } else {
+              setCurrentScreen('home');
+            }
+          },
+          (error) => {
+            console.error('Failed to listen user profile:', error);
           }
-        }
+        );
+      } else {
+        setCurrentUserId('');
+        setUserName('');
+        setUserEmail('');
+        setUserPhone('');
+        setUserCity('');
+        setIsDriver(false);
+        setVehicleType('');
+        setVehiclePlate('');
+        setActiveOrderId(null);
+        setCurrentScreen('splash');
       }
     });
 
-    return unsubscribe;
+    return () => {
+      profileUnsubscribe?.();
+      unsubscribe();
+    };
   }, []);
 
   const handleLogout = () => {
     // Clear all user data
     setUserName('');
-    setUserCity('manama'); // Reset to default city
+    setUserCity('');
     setUserPhone('');
     setUserEmail('');
+    setCurrentUserId('');
+    setActiveOrderId(null);
     setSelectedServiceType('');
     setSelectedService('');
     setBookingDetails({ pickup: '', dropoff: '' });
@@ -82,10 +112,16 @@ export default function App() {
     setCurrentScreen('splash');
   };
 
-  const handleUpdateProfile = (name: string, phone: string, email: string) => {
+  const handleUpdateProfile = async (name: string, phone: string, email: string) => {
     setUserName(name);
     setUserPhone(phone);
     setUserEmail(email);
+    if (!currentUserId) return;
+    try {
+      await updateUserProfile(currentUserId, { name, phone, email });
+    } catch (error) {
+      console.error('Failed to update profile:', error);
+    }
   };
 
   if (currentScreen === 'login') {
@@ -97,7 +133,7 @@ export default function App() {
         }}
         onCreateAccount={() => setCurrentScreen('register')}
         onLogin={(userData) => {
-          setUserName(userData.name || 'Guest User');
+          setUserName(userData.name || '');
           setUserEmail(userData.email);
           setUserPhone(userData.phone);
           setUserCity(userData.city);
@@ -119,7 +155,7 @@ export default function App() {
           setCurrentScreen('driver-system');
         }}
         onNavigateHomeAsGuest={() => {
-          setUserName(''); // Ensure guest mode
+          setUserName('');
           setCurrentScreen('home');
         }}
         onNavigateProfileAsGuest={() => {
@@ -169,7 +205,7 @@ export default function App() {
     return (
       <ProfileScreen 
         onBack={() => setCurrentScreen('home')}
-        userName={userName || 'Guest User'}
+        userName={userName}
         userPhone={userPhone}
         userEmail={userEmail}
         onNavigateHome={() => setCurrentScreen('home')}
@@ -253,6 +289,7 @@ export default function App() {
         dropoffLocation={bookingDetails.dropoff}
         onDriverMatched={() => setCurrentScreen('live-tracking')}
         userCity={userCity}
+        orderId={activeOrderId}
       />
     );
   }
@@ -270,7 +307,26 @@ export default function App() {
         initialDropoff={bookingDetails.dropoff}
         onConfirm={(pickup, dropoff) => {
           setBookingDetails({ pickup, dropoff });
-          setCurrentScreen('driver-matching');
+          const submitOrder = async () => {
+            if (!currentUserId) {
+              setCurrentScreen('driver-matching');
+              return;
+            }
+            try {
+              const newOrderId = await createOrder({
+                pickupAddress: pickup,
+                dropoffAddress: dropoff,
+                pickupLocation: { lat: 26.2235, lng: 50.5876 },
+                dropoffLocation: { lat: 26.2100, lng: 50.5750 },
+              });
+              setActiveOrderId(newOrderId);
+            } catch (error) {
+              console.error('Failed to create order:', error);
+            } finally {
+              setCurrentScreen('driver-matching');
+            }
+          };
+          void submitOrder();
         }}
       />
     );

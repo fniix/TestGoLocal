@@ -1,6 +1,6 @@
 import { ArrowLeft, Phone, MessageCircle, X, Star, Navigation, Share2, Shield, Clock, Home, Search, Bell, User as UserIcon, Car } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { getAllDrivers } from '../../services/firebaseService';
+import { cancelOrder, listenOrderById, listenToDrivers, type DriverData as FirestoreDriverData, type OrderData } from '../../services/firebaseService';
 
 interface DriverData {
   uid: string;
@@ -10,6 +10,7 @@ interface DriverData {
   vehicleType: string;
   vehiclePlate: string;
   phone: string;
+  status: 'available' | 'busy' | 'offline';
 }
 
 interface DriverMatchingScreenProps {
@@ -18,40 +19,68 @@ interface DriverMatchingScreenProps {
   dropoffLocation: string;
   onDriverMatched?: () => void;
   userCity?: string;
+  orderId?: string | null;
 }
 
-export function DriverMatchingScreen({ onBack, pickupLocation, dropoffLocation, onDriverMatched, userCity = 'manama' }: DriverMatchingScreenProps) {
+export function DriverMatchingScreen({ onBack, pickupLocation, dropoffLocation, onDriverMatched, userCity = 'manama', orderId = null }: DriverMatchingScreenProps) {
   const [isSearching, setIsSearching] = useState(true);
   const [searchProgress, setSearchProgress] = useState(0);
   const [driverInfo, setDriverInfo] = useState<DriverData | null>(null);
+  const [drivers, setDrivers] = useState<DriverData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [liveOrder, setLiveOrder] = useState<OrderData | null>(null);
+
+  const formatDriver = (driver: FirestoreDriverData): DriverData => ({
+    uid: driver.driverId,
+    name: driver.name,
+    rating: driver.rating || 4.8,
+    totalTrips: driver.totalTrips || 0,
+    vehicleType: driver.carType || 'Car',
+    vehiclePlate: '',
+    phone: driver.phone || '',
+    status: driver.status,
+  });
 
   useEffect(() => {
-    // Load drivers from Firebase
-    const loadDrivers = async () => {
-      try {
-        const drivers = await getAllDrivers();
-        if (drivers && drivers.length > 0) {
-          // Get a random driver from available drivers
-          const randomDriver = drivers[Math.floor(Math.random() * drivers.length)];
-          setDriverInfo({
-            uid: randomDriver.uid,
-            name: randomDriver.name,
-            rating: randomDriver.rating || 4.8,
-            totalTrips: randomDriver.totalTrips || 150,
-            vehicleType: randomDriver.vehicleType,
-            vehiclePlate: randomDriver.vehiclePlate,
-            phone: randomDriver.phone
-          });
-        }
-      } catch (error) {
-        console.error('Error loading drivers:', error);
-      }
-      setLoading(false);
-    };
+    const unsubscribe = listenToDrivers(
+      (items) => {
+        const mappedDrivers = items.map(formatDriver);
+        setDrivers(mappedDrivers);
 
-    loadDrivers();
+        const availableDrivers = mappedDrivers.filter((item) => item.status === 'available');
+        if (availableDrivers.length > 0) {
+          const randomDriver = availableDrivers[Math.floor(Math.random() * availableDrivers.length)];
+          setDriverInfo(randomDriver);
+        } else {
+          setDriverInfo(null);
+        }
+
+        setLoading(false);
+      },
+      (error) => {
+        console.error('Error loading drivers:', error);
+        setErrorMessage('Could not load drivers right now.');
+        setLoading(false);
+      }
+    );
+
+    return unsubscribe;
   }, []);
+
+  useEffect(() => {
+    if (!orderId) return;
+    const unsubscribe = listenOrderById(
+      orderId,
+      (order) => {
+        setLiveOrder(order);
+      },
+      (error) => {
+        console.error('Failed to subscribe order:', error);
+      }
+    );
+    return unsubscribe;
+  }, [orderId]);
 
   useEffect(() => {
     // Simulate searching for driver
@@ -77,14 +106,25 @@ export function DriverMatchingScreen({ onBack, pickupLocation, dropoffLocation, 
     return '🚙';
   };
 
-  // Use mock data if Firebase data is not loaded
-  const displayDriver = driverInfo || {
-    name: 'Ahmed Al-Khalifa',
-    rating: 4.9,
-    totalTrips: 1247,
-    vehicleType: 'Toyota Camry',
-    vehiclePlate: '45678',
-    phone: '+973 3456 7890'
+  const displayDriver = driverInfo;
+  const orderStatus = liveOrder?.status ?? 'pending';
+  const assignedName = liveOrder?.assignedDriverName ?? null;
+  const assignedPhone = liveOrder?.assignedDriverPhone ?? null;
+
+  const handleCancelOrder = async () => {
+    if (!orderId) return;
+    if (orderStatus !== 'pending') {
+      alert('Only pending orders can be cancelled.');
+      return;
+    }
+    try {
+      await cancelOrder(orderId);
+      alert('Order cancelled successfully.');
+      onBack();
+    } catch (error) {
+      console.error('Failed to cancel order:', error);
+      alert('Failed to cancel order.');
+    }
   };
 
   return (
@@ -104,7 +144,7 @@ export function DriverMatchingScreen({ onBack, pickupLocation, dropoffLocation, 
               {isSearching ? 'Finding Your Ride' : 'Driver Matched!'}
             </h1>
             <p className="text-white/90 text-sm">
-              {isSearching ? 'Please wait a moment...' : 'Your driver is on the way'}
+              {isSearching ? 'Please wait a moment...' : `Order status: ${orderStatus}`}
             </p>
           </div>
         </div>
@@ -112,7 +152,22 @@ export function DriverMatchingScreen({ onBack, pickupLocation, dropoffLocation, 
 
       {/* Main Content */}
       <div className="flex-1 overflow-y-auto px-6 py-6 pb-32">
-        {isSearching ? (
+        {loading ? (
+          <div className="flex flex-col items-center justify-center min-h-[500px]">
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">Loading drivers...</h2>
+            <p className="text-gray-600 text-center">Please wait while we sync live driver data.</p>
+          </div>
+        ) : errorMessage ? (
+          <div className="flex flex-col items-center justify-center min-h-[500px]">
+            <h2 className="text-2xl font-bold text-red-600 mb-2">Unable to load drivers</h2>
+            <p className="text-gray-600 text-center">{errorMessage}</p>
+          </div>
+        ) : !displayDriver ? (
+          <div className="flex flex-col items-center justify-center min-h-[500px]">
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">No drivers available</h2>
+            <p className="text-gray-600 text-center">All drivers are currently busy or offline. Try again in a moment.</p>
+          </div>
+        ) : isSearching ? (
           /* Searching State */
           <div className="flex flex-col items-center justify-center min-h-[500px]">
             {/* Animated Loading Indicator */}
@@ -131,7 +186,7 @@ export function DriverMatchingScreen({ onBack, pickupLocation, dropoffLocation, 
             {/* Progress Text */}
             <h2 className="text-2xl font-bold text-gray-800 mb-2">Searching for a driver...</h2>
             <p className="text-gray-600 text-center mb-6">
-              We're finding the best driver for you
+              We're finding the best driver for you from {drivers.length} live drivers
             </p>
 
             {/* Progress Bar */}
@@ -211,7 +266,9 @@ export function DriverMatchingScreen({ onBack, pickupLocation, dropoffLocation, 
               </div>
               <div className="flex-1">
                 <h3 className="font-semibold text-green-800">Driver Found!</h3>
-                <p className="text-sm text-green-600">Arriving in 3 minutes</p>
+                <p className="text-sm text-green-600">
+                  {orderStatus === 'accepted' ? 'Order accepted in real-time' : 'Arriving in 3 minutes'}
+                </p>
               </div>
             </div>
 
@@ -225,7 +282,7 @@ export function DriverMatchingScreen({ onBack, pickupLocation, dropoffLocation, 
 
                 {/* Driver Details */}
                 <div className="flex-1">
-                  <h2 className="text-xl font-bold text-gray-800">{displayDriver.name}</h2>
+                  <h2 className="text-xl font-bold text-gray-800">{assignedName || displayDriver.name}</h2>
                   <div className="flex items-center gap-2 mb-1">
                     <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
                     <span className="font-semibold text-gray-700">{displayDriver.rating.toFixed(1)}</span>
@@ -233,8 +290,9 @@ export function DriverMatchingScreen({ onBack, pickupLocation, dropoffLocation, 
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                    <span className="text-sm text-green-600 font-medium">Online</span>
+                    <span className="text-sm text-green-600 font-medium">{orderStatus}</span>
                   </div>
+                  {assignedPhone && <p className="text-xs text-gray-500 mt-1">{assignedPhone}</p>}
                 </div>
 
                 {/* Quick Actions */}
@@ -274,7 +332,7 @@ export function DriverMatchingScreen({ onBack, pickupLocation, dropoffLocation, 
                   </div>
                   <div>
                     <p className="text-xs text-gray-600">Estimated Arrival</p>
-                    <p className="text-xl font-bold text-purple-600">{driverInfo.estimatedArrival} min</p>
+                    <p className="text-xl font-bold text-purple-600">3 min</p>
                   </div>
                 </div>
                 <button className="px-4 py-2 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition-colors text-sm">
@@ -341,9 +399,12 @@ export function DriverMatchingScreen({ onBack, pickupLocation, dropoffLocation, 
                 View on Map
               </button>
 
-              <button className="w-full flex items-center justify-center gap-2 bg-white border-2 border-red-500 text-red-600 py-4 rounded-full text-lg font-semibold hover:bg-red-50 transition-all">
+              <button
+                onClick={handleCancelOrder}
+                className="w-full flex items-center justify-center gap-2 bg-white border-2 border-red-500 text-red-600 py-4 rounded-full text-lg font-semibold hover:bg-red-50 transition-all"
+              >
                 <X className="w-5 h-5" />
-                Cancel Ride
+                Cancel Order
               </button>
             </div>
           </div>

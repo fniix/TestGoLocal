@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AdminDashboard } from './AdminDashboard';
 import { AdminUsers } from './AdminUsers';
 import { AdminDrivers } from './AdminDrivers';
@@ -10,9 +10,56 @@ import { AdminViolations } from './AdminViolations';
 import { AdminReports } from './AdminReports';
 import { AdminNotifications } from './AdminNotifications';
 import { AdminSettings } from './AdminSettings';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from '../../../firebase';
+import { listenToUserProfile } from '../../../services/firebaseService';
 
 export function AdminSystemApp() {
   const [currentPage, setCurrentPage] = useState<'dashboard' | 'users' | 'drivers' | 'trips' | 'delivery' | 'payments' | 'complaints' | 'violations' | 'reports' | 'notifications' | 'settings'>('dashboard');
+  const [checkingAccess, setCheckingAccess] = useState(true);
+  const [isAllowed, setIsAllowed] = useState(false);
+
+  useEffect(() => {
+    let unProfile: (() => void) | null = null;
+    const unAuth = onAuthStateChanged(auth, (firebaseUser) => {
+      if (!firebaseUser) {
+        setIsAllowed(false);
+        setCheckingAccess(false);
+        window.location.href = '/';
+        return;
+      }
+
+      unProfile = listenToUserProfile(
+        firebaseUser.uid,
+        (profile) => {
+          const allowed = profile?.role === 'admin';
+          setIsAllowed(allowed);
+          setCheckingAccess(false);
+          if (!allowed) {
+            window.location.href = '/';
+          }
+        },
+        () => {
+          setIsAllowed(false);
+          setCheckingAccess(false);
+          window.location.href = '/';
+        }
+      );
+    });
+
+    return () => {
+      unAuth();
+      if (unProfile) unProfile();
+    };
+  }, []);
+
+  if (checkingAccess) {
+    return <div className="size-full flex items-center justify-center text-gray-500">Checking admin access...</div>;
+  }
+
+  if (!isAllowed) {
+    return <div className="size-full flex items-center justify-center text-gray-500">Redirecting...</div>;
+  }
 
   // Navigate based on current page
   const handleNavigation = (page: 'dashboard' | 'users' | 'drivers' | 'trips' | 'delivery' | 'payments' | 'complaints' | 'violations' | 'reports' | 'notifications' | 'settings') => {
